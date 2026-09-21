@@ -39,13 +39,17 @@ All native calls (ads, purchases, consent, storage, time) go through a `Platform
 
 Each language has a pack:
 
-- alphabet and normalisation rules
+- tile set (each tile is a Unicode string: a letter, an accented letter, or a digraph) and normalisation rules
 - target words: common, curated, used for grid placement, each with a commonness rank
 - accepted words: a large permissive set, used to validate any word the player enters and to compute bonus words at runtime
 - lemma map: surface form to base form, needed for repetition cooldowns
 - profanity list
 
 Bonus words are computed at runtime from the accepted set, not stored per level. That keeps level files small and guarantees no valid word is rejected.
+
+### Tiles and text encoding
+
+Never assume A to Z. Wheels, grids and spellability checks work on tiles from the pack's tile set, not on raw characters. Words are split into tiles by longest match against that set, so digraphs and accented letters work without runtime grapheme segmentation. All text is stored as Unicode NFC. English uses A to Z. Each language needs a font that covers its tiles.
 
 ### English sources
 
@@ -64,7 +68,7 @@ Bonus words are computed at runtime from the accepted set, not stored per level.
 
 Runs in `packages/tools`, logic lives in `packages/core`. Deterministic from a seed (seeded PRNG, never `Math.random`).
 
-1. Pick a wheel word of 3 to 7 letters from the target tier. Its letter multiset is the wheel.
+1. Pick a wheel word of 3 to 7 letters from the target tier. Its tile multiset is the wheel.
 2. Find every accepted word spellable from that multiset (trie walk with letter counts).
 3. Choose grid words from the target tier to hit a target difficulty. All other spellable words become bonus words at runtime.
 4. Lay out the grid: place the longest word first, then add crossings with backtracking. Score candidates on compactness, crossing count and aspect ratio.
@@ -122,7 +126,36 @@ Calibration:
 
 Player setting (Relaxed, Standard, Hard) shifts the target score. A small adaptive nudge uses recent hint use.
 
-## 8. Meta layer (client-only first)
+## 8. Visual design and assets
+
+The ASCII grid in Phase 0 is a debug view only. The shipped game is graphical. The reference game centres on a letter wheel over scenic landscape backgrounds that players unlock as they progress.
+
+Layers:
+
+- Background: a landscape per chapter (a block of levels), changing as the player progresses.
+- Grid: tiles with empty, filled, hint and reveal states, plus fill animations.
+- Wheel: circular letter tiles, a swipe trail, a shuffle button, and a live preview of the word being spelled.
+- HUD and meta UI: coins, hints, daily gift, animals, tournament entry.
+- Feedback: particles, transitions, sound, haptics.
+
+Rendering: Skia for the wheel trail, particles and procedural backgrounds. Reanimated and Gesture Handler for animation and swipe input, keeping animation on the UI thread. Plain React Native views for menus and HUD.
+
+Background sourcing, choose one per release:
+
+1. Procedural (recommended for v1): draw backgrounds from a seed with Skia, using a sky gradient, layered hills, a sun or moon, and a palette per chapter. Tiny download, unlimited variety, no licence questions.
+2. Stock photos (Unsplash, Pexels, Pixabay): commercial use is allowed without attribution, but there are no model releases and no indemnification on the free tiers, and you cannot compile the images into a competing image service. Use landscapes with no people and record the source URL and licence for every image.
+3. AI-generated: in the US, purely AI-generated images generally cannot be copyrighted (the Supreme Court declined the Thaler appeal on March 2, 2026), so you may use them but cannot rely on owning them. Human editing and selection help. Read the generator's terms and keep records. UK rules differ and are not checked here.
+4. Commissioned: clearest ownership. Get a written assignment or licence.
+
+Delivery: compress images (WebP), keep only the first few backgrounds in the app, and download the rest as static files or through Play Asset Delivery. Check Google's current size limits before deciding.
+
+Fonts, icons, sound effects and music also have licences. Record the source and licence of every asset in `assets/LICENSES.md`.
+
+Accessibility: tile states must not rely on colour alone, add a reduce-motion setting, keep text readable over any background, and respect system font scaling.
+
+Store graphics (icon, screenshots, feature graphic) are needed for the Phase 5 listing.
+
+## 9. Meta layer (client-only first)
 
 All reward tables, timers and drop rates live in JSON config so they can be tuned without a release.
 
@@ -133,7 +166,7 @@ All reward tables, timers and drop rates live in JSON config so they can be tune
 - Collectibles: tokens placed in grid slots at runtime. Collecting enough gives a random cosmetic piece. Duplicates fill a bonus meter. Place tokens as an overlay after level load, not inside level data.
 - Randomised rewards are free-earned only. If randomised items are ever sold, Google Play and the App Store both require odds disclosure before purchase, and some countries restrict them. Keep paid currency for deterministic items (hints, ad removal, specific animals). Get legal advice before selling anything randomised.
 
-## 9. Tournaments (later, needs a server)
+## 10. Tournaments (later, needs a server)
 
 - Nakama: leaderboards, tournaments, purchase validation, TypeScript server runtime.
 - Weekend Star tournament first. Team tournaments last (invites, moderation, chat).
@@ -142,7 +175,7 @@ All reward tables, timers and drop rates live in JSON config so they can be tune
 - Anonymous device auth first, linkable to an account later.
 - Per-language leaderboards, since word counts differ.
 
-## 10. Store and compliance (Android)
+## 11. Store and compliance (Android)
 
 - Target API 36 (Android 16) is required for new apps and updates on Google Play since August 31, 2026. Check the Expo SDK's default `targetSdkVersion`. API 36 enforces edge-to-edge and changes back handling (predictive back). Test on Android 16.
 - Play Console account type matters. Personal accounts created after November 13, 2023 must run a closed test with at least 12 testers opted in continuously for 14 days before applying for production access. Recruit 14 or 15 real testers so a dropout does not reset the clock. Engagement is checked, so testers must actually play.
@@ -151,27 +184,28 @@ All reward tables, timers and drop rates live in JSON config so they can be tune
 - Purchases: RevenueCat with Google Play Billing. Test with licensed test accounts on a real device.
 - iOS later: needs a paid Apple Developer account, a real iPhone for purchase testing, and the UIKit scene-based life cycle for builds with the iOS 27 SDK. EAS Submit works from Windows, macOS and Linux.
 
-## 11. Phases
+## 12. Phases
 
 Each phase ends with a gate. Write a short design note in `docs/` and get sign-off before implementing.
 
-0. **Generator spike (Bun, English).** Language pack builder, generator, ASCII grid output, variety report, difficulty histogram over 1,000 levels. Gate: generation success rate, time per level, variety report and difficulty curve look right.
-1. **Feel prototype.** Expo development build on an Android emulator and at least one real phone, ideally including a low-end device. Swipe wheel, grid fill, bonus words, shuffle, hints. Gate: smooth swipe, acceptable pack load time and memory.
+0. **Generator spike (Bun, English).** Language pack builder, generator, ASCII grid output (debug view only, the app renders from the level JSON), variety report, difficulty histogram over 1,000 levels. Gate: generation success rate, time per level, variety report and difficulty curve look right.
+1. **Feel prototype.** Expo development build on an Android emulator and at least one real phone, ideally including a low-end device. Swipe wheel, grid fill, bonus words, shuffle, hints, with placeholder flat-colour art only. Gate: smooth swipe, acceptable pack load time and memory.
 2. **Monetisation pipeline spike.** One test rewarded ad, one sandbox purchase, and the consent flow working on a real device. Gate: end-to-end on device, before content investment.
-3. **Game loop.** Progression, difficulty curve, roughly 1,000 levels, saves, sound, haptics.
+3. **Game loop.** Progression, difficulty curve, roughly 1,000 levels, saves, visual design pass (backgrounds, tile and wheel styling, animation), sound, haptics.
 4. **Meta layer.** Coins, daily gift, bees, animal tap loop, config-driven.
-5. **Play Store launch.** Listing, data safety form, closed test with 12 or more testers for 14 days if required, then production.
+5. **Play Store launch.** Listing and store graphics, data safety form, closed test with 12 or more testers for 14 days if required, then production.
 6. **Backend.** Nakama, weekend Star tournament, score checks.
 7. **iOS.** Same code, iOS build, IAP and consent checks on device, App Store submission.
 8. **More languages.** One with diacritics first to prove the pack design.
 
-## 12. Spike list (unverified)
+## 13. Spike list (unverified)
 
 Confirm these early, do not assume them:
 
 - Bun workspaces plus Metro resolves `packages/core` correctly in the Expo app.
 - Reanimated and Gesture Handler performance on a low-end Android under the New Architecture. Reanimated's docs describe regressions that need specific mitigations.
 - Accepted-word set load time and memory on device. Choose a compact format (packed trie or sorted string array).
+- Unicode normalisation and locale-sensitive casing behave correctly on Hermes, needed before any non-English pack.
 - Nakama JavaScript client works cleanly in React Native.
 - Current Expo SDK version and its default `targetSdkVersion` when scaffolding.
 - Licence review for every word source before shipping.

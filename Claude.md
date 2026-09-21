@@ -24,7 +24,8 @@ Current phase: 0 (generator spike). Update this line when a phase gate passes.
 
 ## Core rules (packages/core)
 
-- No React, no DOM, no Node built-ins.
+- No UI code in this package: no React, no DOM, no Node built-ins. The app itself (`apps/mobile`) is React Native and imports this package.
+- Letters are tiles: Unicode strings from the language pack, never single chars and never assumed A to Z. Text is NFC.
 - Generation is deterministic from a seed. Never use `Math.random`.
 - Never reject a word that is in the accepted set.
 - Repetition cooldowns apply to lemmas, not surface forms.
@@ -56,6 +57,7 @@ Current phase: 0 (generator spike). Update this line when a phase gate passes.
 - Starting a cloud build (EAS) or anything that costs money
 - Adding or changing a word source, because each has its own licence
 - Hand-editing anything in `data/build`. Regenerate it instead.
+- Adding any art, font or audio asset. Record its source and licence in `assets/LICENSES.md`.
 
 ## Secrets and signing
 
