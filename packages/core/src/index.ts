@@ -6,6 +6,16 @@ export { GridBuilder } from './layout';
 export { scoreDifficulty, tierForLevel, TIER_BANDS } from './difficulty';
 export { generateLevel, bonusWords } from './generator';
 export type { GenerateOptions } from './generator';
+export { createFakePlatformServices } from './platform-services';
+export type {
+  PlatformServices,
+  PlatformClock,
+  PlatformStorage,
+  PlatformAds,
+  PlatformPurchases,
+  PlatformConsent,
+  NotAvailable,
+} from './platform-services';
 export type {
   LanguagePack,
   TargetWord,

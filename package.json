@@ -2,12 +2,13 @@
   "name": "wordscapes",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "check": "bun run typecheck && bun run lint && bun test",
-    "typecheck": "tsc --noEmit",
-    "lint": "biome check .",
+    "typecheck": "tsc --noEmit && bun run --cwd apps/mobile typecheck",
+    "lint": "biome check . && bun run --cwd apps/mobile lint",
     "gen": "bun run packages/tools/src/gen.ts"
   },
   "devDependencies": {

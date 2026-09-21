@@ -4,3 +4,8 @@ data/build/
 .DS_Store
 .expo/
 dist/
+
+# Continuous Native Generation: android/ and ios/ are generated from
+# app.json + config plugins. Never hand-edit or commit them.
+apps/mobile/android/
+apps/mobile/ios/
