@@ -1,0 +1,19 @@
+{
+  "name": "wordscapes",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "check": "bun run typecheck && bun run lint && bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "gen": "bun run packages/tools/src/gen.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "@types/bun": "latest",
+    "fast-check": "^3.23.1",
+    "typescript": "^5.7.2"
+  }
+}

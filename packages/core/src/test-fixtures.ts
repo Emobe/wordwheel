@@ -1,0 +1,101 @@
+import { buildTrie } from './trie';
+import type { LanguagePack, TargetWord } from './types';
+
+/**
+ * A small, hermetic English word set for tests. Deliberately not the real
+ * SCOWL pack: tests must run offline and fast, and only need enough
+ * vocabulary to exercise the generator's invariants.
+ */
+const TARGET_WORDS: readonly [string, number][] = [
+  ['a', 10],
+  ['at', 10],
+  ['ate', 10],
+  ['ant', 10],
+  ['ants', 10],
+  ['art', 10],
+  ['are', 10],
+  ['ear', 10],
+  ['east', 10],
+  ['eats', 10],
+  ['rat', 10],
+  ['rate', 10],
+  ['rates', 10],
+  ['rats', 10],
+  ['sat', 10],
+  ['sea', 10],
+  ['seat', 10],
+  ['seats', 10],
+  ['set', 10],
+  ['sets', 10],
+  ['star', 10],
+  ['stare', 10],
+  ['stares', 10],
+  ['stars', 10],
+  ['stear', 20],
+  ['tar', 10],
+  ['tars', 10],
+  ['tars', 10],
+  ['tea', 10],
+  ['teas', 10],
+  ['tear', 10],
+  ['tears', 10],
+  ['tare', 20],
+  ['tares', 20],
+  ['aster', 20],
+  ['asters', 20],
+  ['rase', 20],
+  ['rases', 20],
+  ['raste', 35],
+  ['erst', 35],
+  ['erase', 20],
+  ['erases', 20],
+  ['reset', 20],
+  ['resets', 20],
+  ['taser', 20],
+  ['tasers', 20],
+  ['crane', 10],
+  ['cranes', 10],
+  ['cane', 10],
+  ['canes', 10],
+  ['race', 10],
+  ['races', 10],
+  ['care', 10],
+  ['cares', 10],
+  ['acre', 20],
+  ['acres', 20],
+  ['near', 10],
+  ['nears', 10],
+  ['earn', 10],
+  ['earns', 10],
+  ['crab', 10],
+  ['crabs', 10],
+  ['bar', 10],
+  ['bars', 10],
+  ['bran', 20],
+  ['brans', 20],
+  ['barn', 10],
+  ['barns', 10],
+  ['cab', 10],
+  ['cabs', 10],
+  ['arc', 10],
+  ['arcs', 10],
+  ['ran', 10],
+  ['run', 10],
+  ['runs', 10],
+  ['running', 10],
+  ['runner', 10],
+  ['runners', 10],
+];
+
+const PROFANITY_WORDS = ['badword', 'badwords'];
+
+export function buildTestPack(lang = 'en'): LanguagePack {
+  const targets: TargetWord[] = TARGET_WORDS.map(([word, sizeTier]) => ({ word, sizeTier }));
+  const accepted = buildTrie(targets.map((t) => t.word));
+  return {
+    lang,
+    accepted,
+    targets,
+    profanity: new Set(PROFANITY_WORDS),
+  };
+}
