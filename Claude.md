@@ -2,7 +2,7 @@
 
 Android-first word wheel game. Expo (React Native), TypeScript, Bun workspaces. iOS later.
 Design lives in PLAN.md. Do not import it. Read only the section the task needs.
-Current phase: 0 (generator spike). Update this line when a phase gate passes.
+Current phase: 1 (feel prototype). Update this line when a phase gate passes.
 
 ## Commands
 
