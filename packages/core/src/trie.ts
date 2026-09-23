@@ -1,7 +1,7 @@
 /**
- * A trie over the accepted-word set. Used both to validate a player's word
- * and to enumerate every accepted word spellable from a wheel's letter
- * multiset (a bounded DFS over trie nodes, not over the whole word list).
+ * Trie over the accepted dictionary, used to enumerate every accepted word
+ * spellable from a wheel's multiset of tiles (each tile usable once per
+ * occurrence in the wheel).
  */
 class TrieNode {
   children: Map<string, TrieNode> = new Map();
@@ -10,7 +10,6 @@ class TrieNode {
 
 export class Trie {
   private root = new TrieNode();
-  private wordCount = 0;
 
   insert(word: string): void {
     let node = this.root;
@@ -22,10 +21,7 @@ export class Trie {
       }
       node = next;
     }
-    if (!node.isWord) {
-      node.isWord = true;
-      this.wordCount++;
-    }
+    node.isWord = true;
   }
 
   has(word: string): boolean {
@@ -38,35 +34,31 @@ export class Trie {
     return node.isWord;
   }
 
-  size(): number {
-    return this.wordCount;
-  }
-
   /**
-   * Every accepted word spellable from `letters` (a multiset), with length
-   * at least `minLength`. Order is unspecified.
+   * Every dictionary word (>= minLength) whose letters are a submultiset of
+   * `tiles`. DFS over the trie, branching only on letters still available in
+   * the wheel, so this stays fast even though the dictionary is large.
    */
-  wordsFromLetters(letters: readonly string[], minLength = 3): string[] {
+  wordsFromTiles(tiles: readonly string[], minLength = 3): string[] {
     const counts = new Map<string, number>();
-    for (const ch of letters) {
-      counts.set(ch, (counts.get(ch) ?? 0) + 1);
-    }
+    for (const t of tiles) counts.set(t, (counts.get(t) ?? 0) + 1);
 
     const found: string[] = [];
     const path: string[] = [];
 
     const walk = (node: TrieNode) => {
       if (node.isWord && path.length >= minLength) {
-        found.push(path.join(''));
+        found.push(path.join(""));
       }
-      for (const [ch, child] of node.children) {
-        const available = counts.get(ch) ?? 0;
-        if (available <= 0) continue;
-        counts.set(ch, available - 1);
-        path.push(ch);
+      for (const [letter, count] of counts) {
+        if (count <= 0) continue;
+        const child = node.children.get(letter);
+        if (!child) continue;
+        counts.set(letter, count - 1);
+        path.push(letter);
         walk(child);
         path.pop();
-        counts.set(ch, available);
+        counts.set(letter, count);
       }
     };
 
@@ -75,10 +67,8 @@ export class Trie {
   }
 }
 
-export function buildTrie(words: Iterable<string>): Trie {
+export function buildTrie(words: readonly string[]): Trie {
   const trie = new Trie();
-  for (const word of words) {
-    trie.insert(word);
-  }
+  for (const w of words) trie.insert(w);
   return trie;
 }

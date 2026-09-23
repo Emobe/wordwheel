@@ -1,85 +1,67 @@
-import type { GridWordPlacement, TierBand } from './types';
+import type { Grid, GridWordEntry } from "./types.js";
 
-/** Starting bands from PLAN.md section 7. All tunable post-calibration. */
-export const TIER_BANDS: TierBand[] = [
-  { tier: 1, levelRange: [1, 100], wheelLen: [3, 4], gridWords: [3, 6], maxWordSize: 20 },
-  { tier: 2, levelRange: [101, 400], wheelLen: [4, 5], gridWords: [6, 10], maxWordSize: 35 },
-  { tier: 3, levelRange: [401, 1200], wheelLen: [5, 6], gridWords: [10, 16], maxWordSize: 35 },
-  { tier: 4, levelRange: [1200, 3000], wheelLen: [6, 7], gridWords: [14, 22], maxWordSize: 35 },
-  {
-    tier: 5,
-    levelRange: [3000, Number.POSITIVE_INFINITY],
-    wheelLen: [7, 7],
-    gridWords: [18, 28],
-    maxWordSize: 35,
-  },
-];
-
-const RARE_LETTERS = new Set(['Q', 'Z', 'X', 'J']);
-
-/** Sawtooth mapping from level index (1-based) to a target tier: mostly climbing, with easier levels mixed back in. PLAN.md section 7. */
-export function tierForLevel(levelNumber: number): TierBand {
-  const band = TIER_BANDS.find(
-    (b) => levelNumber >= b.levelRange[0] && levelNumber <= b.levelRange[1],
-  );
-  const base = band ?? TIER_BANDS[TIER_BANDS.length - 1]!;
-  // Sawtooth: every 17th level within a band drops back to the previous band
-  // (or tier 1) so hard runs are broken up by an easier level.
-  if (levelNumber % 17 === 0 && base.tier > 1) {
-    return TIER_BANDS[base.tier - 2]!;
-  }
-  return base;
-}
+const VOWELS = new Set(["A", "E", "I", "O", "U"]);
+const RARE_LETTERS = new Set(["J", "Q", "X", "Z", "V", "K", "W"]);
 
 export interface DifficultyInput {
-  wheelLen: number;
-  gridWords: GridWordPlacement[];
-  wordSizeTiers: Map<string, number>;
-  inflectedCount: number;
+  wheel: string[];
+  grid: Grid;
+  /** rank per grid word, aligned by word (from the pack's grid word list). */
+  ranks: Map<string, number>;
+  /** How many of the grid words are non-base forms (plurals, -ing, etc). */
+  formCount: number;
   requiresFullWheelWord: boolean;
-  gridW: number;
-  gridH: number;
-  crossingCount: number;
 }
 
-export function scoreDifficulty(input: DifficultyInput): number {
-  const {
-    wheelLen,
-    gridWords,
-    wordSizeTiers,
-    inflectedCount,
-    requiresFullWheelWord,
-    gridW,
-    gridH,
-    crossingCount,
-  } = input;
+/**
+ * A single numeric score per section 10: structure, word rarity, letters,
+ * crossings and word forms all contribute. Weights are a starting point,
+ * tunable without regenerating (the curve config maps level -> target score
+ * separately; this only scores a given level).
+ */
+export function computeDifficulty(input: DifficultyInput): number {
+  const { grid, ranks, formCount, requiresFullWheelWord } = input;
+  const wheel = input.wheel.map((t) => t.toUpperCase());
 
-  const structure =
-    wheelLen * 2 + gridWords.length * 1.5 + (gridW * gridH) / 10 + (requiresFullWheelWord ? 5 : 0);
+  const structureScore =
+    wheel.length * 3 + grid.words.length * 2 + (grid.cols * grid.rows) / 10 + (requiresFullWheelWord ? 10 : 0);
 
-  const sizeTiers = gridWords.map((w) => wordSizeTiers.get(w.word) ?? 35);
-  const rarestTier = Math.max(...sizeTiers, 0);
-  const avgTier = sizeTiers.reduce((a, b) => a + b, 0) / Math.max(sizeTiers.length, 1);
-  const rarity = rarestTier * 0.6 + avgTier * 0.4;
+  const rankValues = grid.words.map((w) => ranks.get(w.w.toLowerCase()) ?? 50);
+  const rarestRank = Math.max(...rankValues);
+  const avgRank = rankValues.reduce((a, b) => a + b, 0) / rankValues.length;
+  const rarityScore = rarestRank * 0.5 + avgRank * 0.3;
 
-  let rareLetterHits = 0;
-  let doubledLetterHits = 0;
-  for (const w of gridWords) {
-    const letters = w.word.toUpperCase().split('');
-    for (const ch of letters) {
-      if (RARE_LETTERS.has(ch)) rareLetterHits++;
-    }
-    for (let i = 1; i < letters.length; i++) {
-      if (letters[i] === letters[i - 1]) doubledLetterHits++;
+  const rareLetterCount = wheel.filter((t) => RARE_LETTERS.has(t)).length;
+  const vowelCount = wheel.filter((t) => VOWELS.has(t)).length;
+  const doubledLetters = wheel.length - new Set(wheel).size;
+  const fewVowelsBonus = Math.max(0, 3 - vowelCount) * 2;
+  const letterScore = rareLetterCount * 4 + doubledLetters * 2 + fewVowelsBonus;
+
+  let totalCrossings = 0;
+  for (const w of grid.words) {
+    for (const other of grid.words) {
+      if (w === other) continue;
+      for (let i = 0; i < w.w.length; i++) {
+        const x = w.dir === "H" ? w.x + i : w.x;
+        const y = w.dir === "H" ? w.y : w.y + i;
+        for (let j = 0; j < other.w.length; j++) {
+          const ox = other.dir === "H" ? other.x + j : other.x;
+          const oy = other.dir === "H" ? other.y : other.y + j;
+          if (x === ox && y === oy) totalCrossings++;
+        }
+      }
     }
   }
-  const vowelPoorBonus = gridWords.filter((w) => !/[aeiou]/i.test(w.word.slice(0, -1))).length;
-  const letters = rareLetterHits * 3 + doubledLetterHits * 1.5 + vowelPoorBonus * 2;
+  totalCrossings /= 2; // counted from both sides
+  const crossingScore = Math.max(0, 20 - totalCrossings * 2); // fewer crossings = harder
 
-  const maxPossibleCrossings = Math.max(gridWords.length - 1, 1);
-  const crossingSparsity = (1 - crossingCount / maxPossibleCrossings) * 10;
+  const formScore = formCount * 3;
 
-  const inflected = inflectedCount * 2;
+  return Math.round((structureScore + rarityScore + letterScore + crossingScore + formScore) * 10) / 10;
+}
 
-  return Math.round((structure + rarity + letters + crossingSparsity + inflected) * 10) / 10;
+export function buildRankMap(gridWords: readonly GridWordEntry[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const g of gridWords) map.set(g.word, g.rank);
+  return map;
 }

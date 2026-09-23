@@ -4,208 +4,306 @@ Working title: TBD. Do not use "Wordscapes" or a lookalike name, and do not reus
 
 ## 1. Goal
 
-A mobile word-wheel crossword game: swipe letters on a wheel to fill a crossword grid. It fixes two problems in the game it is modelled on:
+A mobile word-wheel crossword game: swipe letters on a wheel to fill a crossword grid. It fixes three problems with the game it is modelled on:
 
-1. Valid words get rejected. A large, permissive dictionary must accept every real word spellable from the wheel.
-2. The same words and wheels keep repeating. Level selection must track what the player has seen.
-
-Later goals: many languages, weekend tournaments, and a light meta layer (daily gift, animals, bees).
+1. **Too small a word pool.** Levels draw on a much wider list of real words, so the same words come up far less often.
+2. **Valid words rejected.** A large dictionary accepts every real word spellable from the wheel as a bonus word.
+3. **Few languages.** Each language is a separate, self-contained word pack, and languages are never mixed.
 
 ## 2. Decisions
 
 | Area | Decision |
 |---|---|
-| Platform | Android first. iOS later from the same codebase. No web target. |
-| Stack | Expo (React Native) with TypeScript. Development builds, not Expo Go, because ads and purchases need native modules. |
-| Repo | Bun workspaces monorepo: `packages/core`, `packages/tools`, `apps/mobile`. |
-| Languages | English at launch. Everything language-specific lives in data packs. |
-| Levels | Generated offline, shipped as static JSON. Seeded on-device generation only for later endless or daily modes. |
-| Monetisation | Rewarded ads for hints, capped interstitials, remove-ads purchase, coin packs. AdMob for ads, RevenueCat for purchases. |
-| Backend | None at launch. Nakama later for weekend tournaments. |
+| Platform | Android first. iOS later from the same code. |
+| Stack | Expo (React Native) and TypeScript. Development builds, not Expo Go. |
+| Tooling | Bun for packages, scripts, workspaces, tools and tests. Node LTS installed alongside for Expo CLI and Metro. |
+| Repo | Bun workspaces monorepo. |
+| Connectivity | Offline first. Progress syncs to a server later, when one exists. |
+| Word languages | English at launch. More added as data packs. One language per session, never mixed. |
+| App languages | Menus and UI text translated separately from word packs, set up from day one. |
+| Progress | Separate per language. Each language starts at level 1. Coins shared. |
+| Levels | Procedurally generated offline into pools. The phone picks the next level from a pool. |
+| Grid size | Hard maximum width and height, slightly larger for levels with longer words, so every level fits and stays readable on a small phone. |
+| Difficulty | Every level has a score. The curve is a config file, adjustable without regenerating. |
+| Economy | Coins, items and prices all in config. Everything free at launch. 10 coins per level to start. |
+| Visuals | Flat colours from a theme file, with animations. No textures or images yet. |
+| Ads and purchases | Built in behind switches, off at launch. |
+| Analytics | Undecided. An interface with a do-nothing version for now. |
+| Audience | Worldwide, all ages, general players. |
+| Word filtering | Words are words. A blocklist hook exists but is empty. Revisit later. |
+| Verification | Deferred. Designed in when the server is added. |
 
 ## 3. Repo layout
 
 ```
-packages/core     Pure TypeScript. No React, no DOM. Language packs, generator, game rules, difficulty scoring.
-packages/tools    Bun scripts. Word pipeline, level generation, reports. Runs offline.
-apps/mobile       Expo app. UI, input, audio, PlatformServices implementations.
-data/build        Generated packs and levels. Gitignored. Reproducible from tools.
-docs              Short design notes, one per phase.
+packages/core     Pure TypeScript game logic: word packs, generator, rules, scoring, level selection, economy.
+packages/tools    Bun scripts run on your PC: word pipeline, level pool generation, reports.
+apps/mobile       Expo app: screens, theme, translations, animations, SQLite save, platform services.
+data/build        Generated packs and pools. Gitignored. Reproducible from tools.
 ```
 
-All native calls (ads, purchases, consent, storage, time) go through a `PlatformServices` interface so `core` and tests never touch native code.
+`core` has no UI code so it can run on the PC (tools, tests) and inside the app. A future server can reuse it.
 
-## 4. Language packs
+All native and third-party calls (ads, purchases, consent, analytics, storage, time) go through a `PlatformServices` interface, so `core` and tests never touch native code and each service can be swapped or switched off.
 
-Each language has a pack:
+## 4. Word packs
 
-- tile set (each tile is a Unicode string: a letter, an accented letter, or a digraph) and normalisation rules
-- target words: common, curated, used for grid placement, each with a commonness rank
-- accepted words: a large permissive set, used to validate any word the player enters and to compute bonus words at runtime
-- lemma map: surface form to base form, needed for repetition cooldowns
-- profanity list
+Each language is a self-contained pack. Nothing crosses between packs.
 
-Bonus words are computed at runtime from the accepted set, not stored per level. That keeps level files small and guarantees no valid word is rejected.
+- **Tiles:** the letters for that language. Each tile is a Unicode string (a letter, accented letter or digraph). Never assume A to Z. Text is stored as Unicode NFC.
+- **Accepted words:** a large dictionary. Any word in it that can be spelled from the wheel counts as a bonus word.
+- **Grid words:** a deliberately wide list of real, recognisable words that levels are built from, each with a commonness rank.
+- **Base-word map:** links forms like "cats" to "cat", used for variety and so a grid does not hold two forms of one word.
+- **Blocklist:** a hook to exclude words from grids, bonus words or both. Empty for now.
+- **Version number**, bumped whenever the pack changes.
+- **Licence metadata** for every source, used to generate a credits screen.
 
-### Tiles and text encoding
+Rules:
 
-Never assume A to Z. Wheels, grids and spellability checks work on tiles from the pack's tile set, not on raw characters. Words are split into tiles by longest match against that set, so digraphs and accented letters work without runtime grapheme segmentation. All text is stored as Unicode NFC. English uses A to Z. Each language needs a font that covers its tiles.
+- The player picks a word language. The wheel, dictionary checks and levels for that session come from that pack only.
+- Every level is tagged with its language and belongs to one pack only.
+- Progress, seen-word history and difficulty position are stored per language.
 
 ### English sources
 
-- SCOWL for accepted words. Its licence allows use and sale if the copyright notice is kept. Build the list from the size levels you choose, and accept both American and British spellings.
-- SCOWL size levels double as commonness tiers, so no frequency corpus is needed for English.
-- SCOWL ships a small taboo list. Treat it as a starting point and add your own.
+- SCOWL for the accepted dictionary and commonness tiers. Its licence allows use and sale if the copyright notice is kept. Accept both American and British spellings.
 
-### Other languages (later)
+### Later languages
 
-- Candidates: Hunspell dictionaries (need affix expansion to get inflected forms), Wiktionary extracts via kaikki.org (CC BY-SA), FrequencyWords (content is CC BY-SA 4.0, derived from OpenSubtitles).
-- Licences differ per language. Share-alike terms may affect how derived packs can be distributed in a paid app. Get a licence review before shipping any non-English pack.
-- The pipeline records the licence per pack and generates a credits screen.
-- Decide per language: accent handling, casing rules (for example Turkish dotted and dotless i), ß and umlauts for German. Right-to-left scripts need their own layout work. CJK does not fit this mechanic.
+- Candidate sources: Hunspell dictionaries, Wiktionary extracts, frequency lists. Licences differ per source, and share-alike terms may affect distribution in a paid app. Get a licence review before shipping any non-English pack.
+- Per-language decisions: accent handling, casing rules, which digraphs are tiles, and the font needed to show every tile.
 
-## 5. Level generator
+## 5. App languages
 
-Runs in `packages/tools`, logic lives in `packages/core`. Deterministic from a seed (seeded PRNG, never `Math.random`).
+The app's text is separate from the word packs. A player can have Spanish words with English menus.
 
-1. Pick a wheel word of 3 to 7 letters from the target tier. Its tile multiset is the wheel.
-2. Find every accepted word spellable from that multiset (trie walk with letter counts).
-3. Choose grid words from the target tier to hit a target difficulty. All other spellable words become bonus words at runtime.
-4. Lay out the grid: place the longest word first, then add crossings with backtracking. Score candidates on compactness, crossing count and aspect ratio.
-5. Validate: every grid word spellable from the wheel, grid connected, no accidental adjacent words, no profanity, at most one inflected form per lemma in the grid.
-6. Emit JSON and a difficulty score.
+- All UI text goes through a translation layer from day one. No hardcoded strings in screens.
+- The UI language follows the phone's language by default, with an override in settings.
+- Chapter names and item names are translated too.
+- English only at launch. Adding a UI language means adding a translation file.
+- Layouts must cope with longer text in other languages. Right-to-left UI languages need a layout pass before they ship.
+
+## 6. Word pool and variety
+
+Repeats are not banned. The goal is a large enough pool that they feel rare.
+
+- **The grid word list is the main lever.** It is set wide on purpose. The accepted dictionary stays larger still.
+- **Difficulty controls how deep into the list levels reach.** Early levels use common words, so some repetition there is expected. Harder levels reach further in, which is where variety grows.
+- **Variety is a soft preference when choosing a level**, not a rule. Candidates using words the player has not seen for a while score higher.
+- **Variety is judged by base word**, so "cat" and "cats" count as the same word.
+- **Measured before shipping:** the generator report shows distinct grid words and distinct wheels across 1,000 levels, so pool size changes can be compared.
+
+## 7. Level generation
+
+Runs offline in `packages/tools`, with the logic in `packages/core`. Deterministic from a seed (seeded random number generator, never `Math.random`).
+
+1. Pick a wheel word of 3 to 7 tiles from the grid word list. Its tiles form the wheel.
+2. Find every accepted word spellable from those tiles.
+3. Choose grid words to hit a target difficulty.
+4. Lay out the grid within the size limits (section 8): longest word first, then crossings with backtracking. Score layouts on compactness, number of crossings and shape.
+5. Optionally mark one grid word as a coin word (section 13).
+6. Validate: every grid word spellable from the wheel, grid connected, no accidental words formed by adjacent tiles, blocklist check, at most one form of each base word in the grid, grid within size limits.
+7. Save the level with its difficulty score into the pool for its difficulty band.
+
+The output is a **pool of levels per difficulty band per language**, far larger than anyone plays through. There is no fixed level 1, level 2 sequence. More pools can be downloaded later.
+
+Bonus words are worked out in the app from the accepted dictionary, not stored in level files.
 
 Level file shape:
 
 ```json
 {
-  "id": "en-000123",
+  "id": "en-b3-000123",
   "lang": "en",
+  "packVersion": 1,
+  "band": 3,
   "wheel": ["T","A","R","E","S"],
-  "grid": { "w": 7, "h": 6, "words": [ { "w": "STARE", "x": 0, "y": 2, "dir": "H" } ] },
-  "difficulty": 37.5,
-  "tier": 3
+  "grid": {
+    "cols": 7,
+    "rows": 6,
+    "words": [ { "w": "STARE", "x": 0, "y": 2, "dir": "H", "coins": false } ]
+  },
+  "difficulty": 37.5
 }
 ```
 
-## 6. Variety rules
+Level IDs never change once published. Regenerating a pool creates new IDs, so play history stays valid.
 
-The repetition problem in the reference game is a fixed pool that loops. Plurals make it worse because "cat" and "cats" look different but feel the same.
+## 8. Grid size limits
 
-- Cooldowns apply to lemmas, not surface forms.
-- Per-player history records when each wheel word and grid lemma was last seen. Candidate levels are weighted by time since last seen.
-- Starting values, to be tuned: no wheel word repeats within about 500 levels, no grid lemma within about 30 levels, shorter window for 3-letter words.
-- Reject near-duplicate levels: different wheels with the same letters, or grids that share most of their words.
-- Never loop. Ship new packs as static JSON downloaded on demand.
-- The generator CLI prints a variety report for 1,000 levels: distinct wheels, distinct grid lemmas against total slots, and the longest gap before any repeat.
+Every level must fit on a small phone without scrolling and stay readable. Nothing may come out tall and thin just because the words happen to fit that way.
 
-## 7. Difficulty scale
+Design target: a 360 by 640 dp portrait screen, a common compact Android size. The wheel takes the lower part of the screen, so the grid gets roughly the top half. For comparison, a typical Wordscapes grid is around 10 columns by 8 rows.
 
-Every level gets a numeric score from measurable features:
+Limits scale with the size of the wheel, so levels with longer words get a slightly larger grid. Starting values, all in generator config and tuned on a real device in Phase 1:
 
-- structure: wheel size, grid word count, grid size, whether the full-wheel word is required
-- word rarity: rarest required word and average rarity
-- letters: rare letters (Q, Z, X, J), doubled letters, vowel-poor wheels
-- crossings: fewer crossings means fewer free letters, so harder
-- inflected forms required
+| Wheel size | Max columns | Max rows | Tile width on the 360 dp design target |
+|---|---|---|---|
+| 3-6 tiles | 10 | 9 | about 31 dp |
+| 7 tiles | 11 | 10 | about 28 dp |
 
-A target score is mapped from level number as a sawtooth: easier levels are mixed in after hard ones. Starting bands, all tunable:
+Tile widths assume 16 dp side margins and 2 dp gaps between tiles. At 12 columns tiles would drop to about 25 dp, which is below the readability floor, so 11 by 10 is the ceiling for any level.
 
-| Tier | Levels | Wheel | Grid words | Rarest required word | Notes |
-|---|---|---|---|---|---|
-| 1 | 1-100 | 3-4 | 3-6 | most common tier | base forms only, no rare letters |
-| 2 | 101-400 | 4-5 | 6-10 | common | some plurals |
-| 3 | 401-1200 | 5-6 | 10-16 | mid | doubled letters, a few rare letters |
-| 4 | 1200-3000 | 6-7 | 14-22 | uncommon | fewer crossings, anagram clusters |
-| 5 | 3000+ | 7 | 18-28 | rare but valid | sparse grids, all forms in play |
+Other limits for every size:
 
-Calibration:
+| Setting | Starting value | Why |
+|---|---|---|
+| Shape | rows no more than 1.2 times columns, and columns no more than 1.6 times rows | Stops very tall or very wide grids |
+| Min tile size | 28 dp on the design target | Readability floor |
 
-1. Before launch: a simulated player that knows each word with a probability based on its frequency. Check that scores track its solve time and hint use.
-2. After launch: log completion time, hints used and quit rate per level, and refit the weights.
+Rules:
 
-Player setting (Relaxed, Standard, Hard) shifts the target score. A small adaptive nudge uses recent hint use.
+- The generator rejects any layout outside these limits. They are checked in validation, not left to the app.
+- Limits must allow the longest wheel word (7 tiles) in either direction.
+- The app scales tiles to fill the available grid area on bigger screens, up to a maximum tile size so small grids do not look oversized.
+- Letters on tiles scale with the tile size.
+- If a limit changes, regenerate the pools. Old levels are never stretched to fit.
 
-## 8. Visual design and assets
+## 9. Choosing the next level (on the phone)
 
-The ASCII grid in Phase 0 is a debug view only. The shipped game is graphical. The reference game centres on a letter wheel over scenic landscape backgrounds that players unlock as they progress.
+1. Work out the target difficulty from the player's level number using the difficulty curve config.
+2. Take candidates from the matching band's pool that the player has not played.
+3. Rank them by closeness to the target difficulty and by how long since the player last saw their grid words and wheel.
+4. Pick from the top few, with a little randomness so two players do not get identical runs.
 
-Layers:
+## 10. Difficulty
 
-- Background: a landscape per chapter (a block of levels), changing as the player progresses.
-- Grid: tiles with empty, filled, hint and reveal states, plus fill animations.
-- Wheel: circular letter tiles, a swipe trail, a shuffle button, and a live preview of the word being spelled.
-- HUD and meta UI: coins, hints, daily gift, animals, tournament entry.
-- Feedback: particles, transitions, sound, haptics.
+Each level gets a numeric score from measurable features:
 
-Rendering: Skia for the wheel trail, particles and procedural backgrounds. Reanimated and Gesture Handler for animation and swipe input, keeping animation on the UI thread. Plain React Native views for menus and HUD.
+- **Structure:** wheel size, number of grid words, grid size, whether the full-wheel word is required.
+- **Word rarity:** the rarest required word and the average rarity.
+- **Letters:** rare letters, doubled letters, few vowels.
+- **Crossings:** fewer crossings give away fewer letters, so harder.
+- **Word forms:** how many plurals and other forms are required.
 
-Background sourcing, choose one per release:
+The **difficulty curve** is a config file that maps level number to a target score. It rises with easier levels mixed in after hard ones. It can be reshaped without regenerating levels.
 
-1. Procedural (recommended for v1): draw backgrounds from a seed with Skia, using a sky gradient, layered hills, a sun or moon, and a palette per chapter. Tiny download, unlimited variety, no licence questions.
-2. Stock photos (Unsplash, Pexels, Pixabay): commercial use is allowed without attribution, but there are no model releases and no indemnification on the free tiers, and you cannot compile the images into a competing image service. Use landscapes with no people and record the source URL and licence for every image.
-3. AI-generated: in the US, purely AI-generated images generally cannot be copyrighted (the Supreme Court declined the Thaler appeal on March 2, 2026), so you may use them but cannot rely on owning them. Human editing and selection help. Read the generator's terms and keep records. UK rules differ and are not checked here.
-4. Commissioned: clearest ownership. Get a written assignment or licence.
+Starting bands, all tunable:
 
-Delivery: compress images (WebP), keep only the first few backgrounds in the app, and download the rest as static files or through Play Asset Delivery. Check Google's current size limits before deciding.
+| Band | Levels | Wheel | Grid words | Rarest required word |
+|---|---|---|---|---|
+| 1 | 1-100 | 3-4 | 3-6 | most common |
+| 2 | 101-400 | 4-5 | 6-10 | common |
+| 3 | 401-1200 | 5-6 | 8-14 | mid |
+| 4 | 1200-3000 | 6-7 | 10-16 | uncommon |
+| 5 | 3000+ | 7 | 12-18 | rare but valid |
 
-Fonts, icons, sound effects and music also have licences. Record the source and licence of every asset in `assets/LICENSES.md`.
+Grid word counts are capped by the grid size limits in section 8. The general player is the target: most people should get through a level without hints most of the time.
 
-Accessibility: tile states must not rely on colour alone, add a reduce-motion setting, keep text readable over any background, and respect system font scaling.
+Later: a player setting (Relaxed, Standard, Hard) that shifts the target score. The design supports it from the start even if the setting ships later.
 
-Store graphics (icon, screenshots, feature graphic) are needed for the Phase 5 listing.
+Calibration: before launch, a simulated player that knows words based on how common they are, checked against solve time and hint use. After launch, needs analytics (section 16).
 
-## 9. Meta layer (client-only first)
+## 11. Chapters
 
-All reward tables, timers and drop rates live in JSON config so they can be tuned without a release.
+Levels are grouped into chapters for display, for example "Chapter name 10".
 
-- Coins and hints. Rewarded ads grant coins or hints.
-- Daily gift: player picks one of three boxes. Use stored timestamps. Add a server time check once a backend exists.
-- Bees: a hint that reveals the first letter of a word.
-- Animals: an idle loop where the player taps periodically to collect a bonus (bees, binocular-style collectible tokens, stars). Animals unlock with eggs and gems.
-- Collectibles: tokens placed in grid slots at runtime. Collecting enough gives a random cosmetic piece. Duplicates fill a bonus meter. Place tokens as an overlay after level load, not inside level data.
-- Randomised rewards are free-earned only. If randomised items are ever sold, Google Play and the App Store both require odds disclosure before purchase, and some countries restrict them. Keep paid currency for deterministic items (hints, ad removal, specific animals). Get legal advice before selling anything randomised.
+- Chapter length and names are in config, per UI language.
+- Each chapter has its own colour palette from the theme file. Backgrounds replace palettes later.
+- Chapters are display only. Level choice still comes from the pools and the difficulty curve.
 
-## 10. Tournaments (later, needs a server)
+## 12. Screens
 
-- Nakama: leaderboards, tournaments, purchase validation, TypeScript server runtime.
-- Weekend Star tournament first. Team tournaments last (invites, moderation, chat).
-- Bucketed leaderboards: small brackets of similar players. Fill sparse brackets with simulated players, labelled as bots.
-- Anti-cheat: levels have IDs, so the server rejects star counts above the level's word count and implausible completion times.
-- Anonymous device auth first, linkable to an account later.
-- Per-language leaderboards, since word counts differ.
+**Game screen**, top to bottom:
 
-## 11. Store and compliance (Android)
+- Header: back, menu, chapter and level title, settings.
+- Grid: empty slots, filled tiles, hinted tiles, and coin-word slots marked with a coin.
+- Word preview: the word being spelled, shown above the wheel.
+- Wheel: letter circles. Selected letters highlight, joined by the swipe line.
+- Around the wheel: shuffle, hint button showing its cost, bonus words button, coin balance with a shop button.
 
-- Target API 36 (Android 16) is required for new apps and updates on Google Play since August 31, 2026. Check the Expo SDK's default `targetSdkVersion`. API 36 enforces edge-to-edge and changes back handling (predictive back). Test on Android 16.
-- Play Console account type matters. Personal accounts created after November 13, 2023 must run a closed test with at least 12 testers opted in continuously for 14 days before applying for production access. Recruit 14 or 15 real testers so a dropout does not reset the clock. Engagement is checked, so testers must actually play.
-- Consent: a UMP consent flow for EEA and UK users before the first ad request.
-- Ads: test ad units in development. Never click your own production ads.
-- Purchases: RevenueCat with Google Play Billing. Test with licensed test accounts on a real device.
-- iOS later: needs a paid Apple Developer account, a real iPhone for purchase testing, and the UIKit scene-based life cycle for builds with the iOS 27 SDK. EAS Submit works from Windows, macOS and Linux.
+**Other screens:**
 
-## 12. Phases
+- First-run tutorial: a few guided levels showing swiping, bonus words, shuffle and hints.
+- Home: continue, language picker, settings.
+- Language picker: word language, separate from UI language.
+- Bonus words list: words found this level and overall.
+- Shop: reads from the item catalog. Shows items and prices, all free at launch.
+- Settings: UI language, sound, haptics, reduce motion, privacy and consent, credits.
+- Level complete: coins earned, continue.
 
-Each phase ends with a gate. Write a short design note in `docs/` and get sign-off before implementing.
+## 13. Economy
 
-0. **Generator spike (Bun, English).** Language pack builder, generator, ASCII grid output (debug view only, the app renders from the level JSON), variety report, difficulty histogram over 1,000 levels. Gate: generation success rate, time per level, variety report and difficulty curve look right.
-1. **Feel prototype.** Expo development build on an Android emulator and at least one real phone, ideally including a low-end device. Swipe wheel, grid fill, bonus words, shuffle, hints, with placeholder flat-colour art only. Gate: smooth swipe, acceptable pack load time and memory.
-2. **Monetisation pipeline spike.** One test rewarded ad, one sandbox purchase, and the consent flow working on a real device. Gate: end-to-end on device, before content investment.
-3. **Game loop.** Progression, difficulty curve, roughly 1,000 levels, saves, visual design pass (backgrounds, tile and wheel styling, animation), sound, haptics.
-4. **Meta layer.** Coins, daily gift, bees, animal tap loop, config-driven.
-5. **Play Store launch.** Listing and store graphics, data safety form, closed test with 12 or more testers for 14 days if required, then production.
-6. **Backend.** Nakama, weekend Star tournament, score checks.
-7. **iOS.** Same code, iOS build, IAP and consent checks on device, App Store submission.
-8. **More languages.** One with diacritics first to prove the pack design.
+Everything is data, so items and prices can be decided later without code changes.
 
-## 13. Spike list (unverified)
+- **Wallet:** one coin balance, shared across languages.
+- **Earning rules (config):** 10 coins per level completed to start. Slots for bonus-word coins, coin words and daily rewards, set to 0 for now.
+- **Coin words:** a grid word can be marked as worth extra coins, shown with coin symbols in its slots. Off by default in config.
+- **Item catalog (config):** each item has an ID, type, coin price and an optional real-money product ID. Starting items: reveal a letter, reveal a word. Later: bees, cosmetics, remove ads.
+- **Launch prices:** every coin price set to 0, so everything is free. Changing a price is a config change.
+- **Inventory:** how many of each item the player owns.
+- **Ledger:** every coin and item change goes through one function and is written to the change log (section 14). Nothing changes the balance directly.
+- **Remote config later:** economy files can be downloaded, so prices can change without an app update.
 
-Confirm these early, do not assume them:
+## 14. Save, backup and future sync
 
-- Bun workspaces plus Metro resolves `packages/core` correctly in the Expo app.
-- Reanimated and Gesture Handler performance on a low-end Android under the New Architecture. Reanimated's docs describe regressions that need specific mitigations.
-- Accepted-word set load time and memory on device. Choose a compact format (packed trie or sorted string array).
-- Unicode normalisation and locale-sensitive casing behave correctly on Hermes, needed before any non-English pack.
-- Nakama JavaScript client works cleanly in React Native.
-- Current Expo SDK version and its default `targetSdkVersion` when scaffolding.
+- **SQLite on the phone.**
+- **Current state:** per-language level number and settings, shared coins and inventory.
+- **Change log:** each change (level completed, words found, coins or items gained or spent) is saved as a record with an ID, timestamp and a "synced" flag.
+- **Seen history:** per language, when each base word and wheel was last seen.
+- **Anonymous player ID** created on first install, so offline progress can attach to an account later.
+- **Android Auto Backup:** saves app data to the user's Google Drive, up to 25 MB, including databases by default. Progress survives a reinstall or new phone before there is a server. Downloaded level pools go in a folder excluded from backup, since they can be downloaded again.
+- **Versioning:** the save records which pack and pool versions the player has. Migrations run when the app updates.
+- **Sync later:** upload unsynced records when online, the server merges them into the account and marks them done. Verification is designed at that point.
+
+## 15. Visuals
+
+- **Theme file** with named colour tokens: background, tile states, wheel, accent, text, and a palette per chapter. Light and dark versions.
+- **Plain React Native views** for the grid, tiles and menus.
+- **Reanimated** for animation: tiles filling when a word is found, wheel shuffle, the word moving from the preview into the grid, a shake on a wrong word, coins counting up, level complete.
+- **Skia only for the swipe line** between letters.
+- Tile states must not rely on colour alone. Add a reduce-motion setting.
+- Fonts must cover every tile in every word pack and every UI language shipped.
+- Textures, backgrounds and art come later and replace theme tokens rather than code.
+
+## 16. Ads, purchases and analytics
+
+All behind `PlatformServices`, each with a do-nothing version, and each switched by config.
+
+- **Ads (off at launch):** AdMob through `react-native-google-mobile-ads`. Rewarded ads for coins or hints, capped interstitials. Test ad unit IDs in development.
+- **Purchases (off at launch):** RevenueCat, which also validates purchases before our own server exists. Products map to catalog items.
+- **Consent:** a consent flow for EEA and UK users before the first ad request, needed once ads are on.
+- **Analytics (undecided):** the game logs events such as level start, level complete, hint used, time taken and quit, through the interface. The do-nothing version discards them. Pick a provider later. Difficulty calibration after launch depends on this.
+
+## 17. Audience and store compliance
+
+- **All ages, worldwide.** On Google Play, any app whose target audience includes children must follow the Families Policy. For ads that means only certified ad SDKs for children and users of unknown age, or a neutral age screen, no interest-based ads to children, and ads closeable after 5 seconds. Settle this before ads are switched on. Any analytics provider must also be checked against it.
+- **Privacy policy:** required by Play Console before the target audience section can be filled in. Needed before launch.
+- **Content rating questionnaire:** answer it with the word list in mind, since bonus words are unfiltered for now.
+- **Target API 36:** Google Play requires new apps and updates to target Android 16. Check the Expo SDK default `targetSdkVersion`. API 36 enforces edge-to-edge and changes back handling, so test on Android 16.
+- **Closed test:** personal Play Console accounts created after November 13, 2023 must run a closed test with at least 12 testers opted in for 14 days before production. Recruit 14 or 15 so a dropout does not reset the clock.
+
+## 18. Later, not now
+
+- Server (Nakama, TypeScript runtime): accounts, sync, verification, purchase checks.
+- Pricing, item list, ads and purchases switched on.
+- Analytics provider.
+- Word filtering decisions.
+- Weekend tournaments, per language.
+- Meta layer: daily gift, bees as hints, tap-to-collect animals, collectibles.
+- Word definitions on tap (licence check needed).
+- iOS.
+- Textures, backgrounds and art.
+- More word languages and UI languages.
+
+## 19. Phases
+
+Each phase ends with a gate that must pass before the next starts.
+
+0. **Generator spike (English).** Pack builder, generator with grid size limits, ASCII grid printout for checking (debug only), variety report, difficulty histogram over 1,000 levels. Gate: success rate, time per level, variety and difficulty curve look right, every level within limits.
+1. **Feel prototype.** Expo development build on a real Android phone, ideally including a small, low-end one. Wheel, swipe line, word preview, grid, bonus words, shuffle, flat colours. Gate: smooth swipe, readable grid at the size limits, limits tuned.
+2. **Game loop.** Level selection from pools, difficulty curve, chapters, SQLite save and change log, word language picker with per-language progress, translation layer, economy with free items, hints, animations, sound, haptics, tutorial, settings.
+3. **Services spike.** Ads, purchases and consent working on a real device with test IDs, then switched off by config. Gate: each works end to end and each switch works.
+4. **Play Store launch.** Privacy policy, target audience and content rating, listing, store graphics, data safety form, closed test if required, production.
+5. **Then the "later" list,** in an order decided at that point.
+
+## 20. Spike list (unverified)
+
+- Bun workspaces and Metro resolve `packages/core` correctly in the Expo app.
+- EAS cloud builds detect Bun in the monorepo. A 2024 bug made EAS fall back to Yarn, so test a cloud build early.
+- Reanimated and gesture handling performance on a low-end Android phone.
+- Accepted dictionary load time and memory on the phone. Choose a compact format.
+- Pool size needed per band, and its download size.
+- Unicode normalisation and casing on the phone's JavaScript engine before any non-English pack.
+- Current Expo SDK version and default `targetSdkVersion` when scaffolding.
 - Licence review for every word source before shipping.

@@ -1,40 +1,48 @@
-import { describe, expect, test } from 'bun:test';
-import fc from 'fast-check';
-import { Rng } from './prng';
+import { describe, expect, test } from "bun:test";
+import { makeRng, randomInt, seedFromString, shuffle } from "./prng.js";
 
-describe('Rng', () => {
-  test('same seed produces the same sequence', () => {
-    fc.assert(
-      fc.property(fc.string({ minLength: 1 }), fc.integer({ min: 1, max: 50 }), (seed, count) => {
-        const a = new Rng(seed);
-        const b = new Rng(seed);
-        const seqA = Array.from({ length: count }, () => a.next());
-        const seqB = Array.from({ length: count }, () => b.next());
-        expect(seqA).toEqual(seqB);
-      }),
-    );
+describe("prng", () => {
+  test("same seed produces same sequence", () => {
+    const a = makeRng(42);
+    const b = makeRng(42);
+    const seqA = Array.from({ length: 10 }, () => a());
+    const seqB = Array.from({ length: 10 }, () => b());
+    expect(seqA).toEqual(seqB);
   });
 
-  test('next() stays within [0, 1)', () => {
-    fc.assert(
-      fc.property(fc.string({ minLength: 1 }), (seed) => {
-        const rng = new Rng(seed);
-        for (let i = 0; i < 20; i++) {
-          const v = rng.next();
-          expect(v).toBeGreaterThanOrEqual(0);
-          expect(v).toBeLessThan(1);
-        }
-      }),
-    );
+  test("different seeds diverge", () => {
+    const a = makeRng(1);
+    const b = makeRng(2);
+    expect(a()).not.toEqual(b());
   });
 
-  test('shuffle is a permutation of the input', () => {
-    fc.assert(
-      fc.property(fc.string({ minLength: 1 }), fc.array(fc.integer()), (seed, items) => {
-        const rng = new Rng(seed);
-        const shuffled = rng.shuffle(items);
-        expect(shuffled.slice().sort()).toEqual(items.slice().sort());
-      }),
-    );
+  test("values are in [0, 1)", () => {
+    const rng = makeRng(7);
+    for (let i = 0; i < 1000; i++) {
+      const v = rng();
+      expect(v).toBeGreaterThanOrEqual(0);
+      expect(v).toBeLessThan(1);
+    }
+  });
+
+  test("randomInt stays within bounds", () => {
+    const rng = makeRng(99);
+    for (let i = 0; i < 500; i++) {
+      const v = randomInt(rng, 3, 7);
+      expect(v).toBeGreaterThanOrEqual(3);
+      expect(v).toBeLessThanOrEqual(7);
+    }
+  });
+
+  test("shuffle is deterministic per seed and a permutation", () => {
+    const input = [1, 2, 3, 4, 5];
+    const a = shuffle(makeRng(5), input);
+    const b = shuffle(makeRng(5), input);
+    expect(a).toEqual(b);
+    expect([...a].sort()).toEqual(input);
+  });
+
+  test("seedFromString is deterministic", () => {
+    expect(seedFromString("en-band3")).toEqual(seedFromString("en-band3"));
   });
 });

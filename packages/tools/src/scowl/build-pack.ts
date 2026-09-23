@@ -1,157 +1,117 @@
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+/**
+ * Builds the English word pack (section 4) from a local SCOWL checkout.
+ *
+ * SCOWL license (see .tmp-scowl/Copyright): "Permission to use, copy,
+ * modify, distribute and sell these word lists ... for any purpose is
+ * hereby granted without fee, provided that the above copyright notice
+ * appears ... and that both that copyright notice and this permission
+ * notice appear in supporting documentation." Permissive, use+sell
+ * allowed, notice must be kept — satisfied by copying it into the pack's
+ * `license` field below, to carry through to the app's credits screen later.
+ *
+ * Run: bun run build-pack [path-to-scowl-final-dir]
+ */
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { buildBaseWordMap } from "../../../core/src/lemma.js";
+import type { GridWordEntry, WordPack } from "../../../core/src/types.js";
 
-const SCOWL_VERSION = '2020.12.07';
-const SCOWL_URL = `https://downloads.sourceforge.net/project/wordlist/SCOWL/${SCOWL_VERSION}/scowl-${SCOWL_VERSION}.tar.gz`;
+const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
+const DEFAULT_SCOWL_DIR = path.join(REPO_ROOT, ".tmp-scowl", "final");
+const OUT_DIR = path.join(REPO_ROOT, "data", "build", "packs");
 
-const REPO_ROOT = join(import.meta.dir, '..', '..', '..', '..');
-const CACHE_DIR = join(REPO_ROOT, 'data', 'build', '.cache', `scowl-${SCOWL_VERSION}`);
-const PACK_DIR = join(REPO_ROOT, 'data', 'build', 'packs', 'en');
+// Both American and British spellings, plus the size-neutral "english" core, per section 4.
+const VARIANTS = ["english", "american", "british"];
+const SIZES = [10, 20, 35, 40, 50, 55, 60, 70, 80, 95];
 
-/** Accepted-set ceiling and target-word ceiling, per the Phase 0 sign-off. */
-export const ACCEPTED_MAX_SIZE = 70;
-export const TARGET_MAX_SIZE = 35;
-export const TARGET_MIN_SIZE = 10;
+/** Bonus-word dictionary: every size, so any real word spellable from the wheel counts. */
+const ACCEPTED_MAX_SIZE = 95;
+/** Grid word list: wide but stops short of the most obscure/archaic tier. */
+const GRID_MAX_SIZE = 80;
 
-const FINAL_FILE_RE =
-  /^(american|british|british_z|canadian|australian|english)-(words|contractions)\.(\d+)$/;
-const ALPHA_ONLY_RE = /^[a-z]+$/;
+const WORD_RE = /^[a-z]+$/;
 
-async function ensureScowlSource(): Promise<string> {
-  const extractedDir = join(CACHE_DIR, `scowl-${SCOWL_VERSION}`);
-  if (existsSync(join(extractedDir, 'final'))) {
-    return extractedDir;
+async function readWordFile(filePath: string): Promise<string[]> {
+  let text: string;
+  try {
+    text = await readFile(filePath, "latin1");
+  } catch {
+    return [];
   }
-
-  await mkdir(CACHE_DIR, { recursive: true });
-  const tarPath = join(CACHE_DIR, 'scowl.tar.gz');
-  if (!existsSync(tarPath)) {
-    console.log(`Downloading SCOWL ${SCOWL_VERSION}...`);
-    const res = await fetch(SCOWL_URL);
-    if (!res.ok) {
-      throw new Error(`Failed to download SCOWL: ${res.status} ${res.statusText}`);
-    }
-    await writeFile(tarPath, new Uint8Array(await res.arrayBuffer()));
-  }
-
-  console.log('Extracting SCOWL...');
-  // --force-local: MSYS/Git-Bash tar otherwise reads a Windows "C:\..." path
-  // as a "host:path" remote-archive spec and tries to shell out to ssh.
-  // Forward slashes avoid a separate MSYS backslash-escaping issue with -C.
-  const proc = Bun.spawn(
-    [
-      'tar',
-      '--force-local',
-      '-xzf',
-      tarPath.replaceAll('\\', '/'),
-      '-C',
-      CACHE_DIR.replaceAll('\\', '/'),
-    ],
-    { stdout: 'inherit', stderr: 'inherit' },
-  );
-  const exitCode = await proc.exited;
-  if (exitCode !== 0) {
-    throw new Error(`tar extraction failed with exit code ${exitCode}`);
-  }
-  return extractedDir;
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim().toLowerCase())
+    .filter((w) => WORD_RE.test(w) && w.length >= 3);
 }
 
-interface BuiltPack {
-  accepted: string[];
-  targets: { word: string; sizeTier: number }[];
-  profanity: string[];
-  licence: string;
-}
-
-async function buildFromSource(sourceDir: string): Promise<BuiltPack> {
-  const finalDir = join(sourceDir, 'final');
-  const files = await readdir(finalDir);
-
-  // word -> smallest SCOWL size it appears at (size levels are cumulative
-  // buckets of rarity, so the smallest size a word appears in is its
-  // commonness tier).
-  const minSize = new Map<string, number>();
-
-  for (const file of files) {
-    const match = FINAL_FILE_RE.exec(file);
-    if (!match) continue;
-    const size = Number.parseInt(match[3]!, 10);
-    if (size > ACCEPTED_MAX_SIZE) continue;
-
-    const content = await readFile(join(finalDir, file), 'latin1');
-    for (const rawLine of content.split('\n')) {
-      const word = rawLine.trim().toLowerCase();
-      if (!word || !ALPHA_ONLY_RE.test(word)) continue;
-      const existing = minSize.get(word);
-      if (existing === undefined || size < existing) {
-        minSize.set(word, size);
+async function loadScowl(scowlDir: string): Promise<Map<string, number>> {
+  const rank = new Map<string, number>();
+  for (const variant of VARIANTS) {
+    for (const size of SIZES) {
+      const file = path.join(scowlDir, `${variant}-words.${size}`);
+      const words = await readWordFile(file);
+      for (const w of words) {
+        const existing = rank.get(w);
+        if (existing === undefined || size < existing) rank.set(w, size);
       }
     }
   }
+  return rank;
+}
 
-  const accepted = [...minSize.keys()].sort();
-  const targets = [...minSize.entries()]
-    .filter(([, size]) => size >= TARGET_MIN_SIZE && size <= TARGET_MAX_SIZE)
-    .map(([word, sizeTier]) => ({ word, sizeTier }))
+async function main() {
+  const scowlDir = process.argv[2] ?? DEFAULT_SCOWL_DIR;
+  console.log(`Reading SCOWL word lists from ${scowlDir} ...`);
+
+  const rankByWord = await loadScowl(scowlDir);
+  console.log(`Loaded ${rankByWord.size} distinct words across sizes ${SIZES.join(", ")}.`);
+
+  const accepted = [...rankByWord.entries()]
+    .filter(([, rank]) => rank <= ACCEPTED_MAX_SIZE)
+    .map(([w]) => w)
+    .sort();
+
+  const gridWords: GridWordEntry[] = [...rankByWord.entries()]
+    .filter(([w, rank]) => rank <= GRID_MAX_SIZE && w.length >= 3 && w.length <= 7)
+    .map(([word, rank]) => ({ word, rank }))
     .sort((a, b) => a.word.localeCompare(b.word));
 
-  const profanity = new Set<string>();
-  for (const profaneFile of ['profane.1', 'profane.3']) {
-    const path = join(sourceDir, 'misc', profaneFile);
-    if (!existsSync(path)) continue;
-    const content = await readFile(path, 'latin1');
-    for (const rawLine of content.split('\n')) {
-      const word = rawLine.trim().toLowerCase();
-      if (word) profanity.add(word);
-    }
+  console.log(`Accepted (bonus) dictionary: ${accepted.length} words.`);
+  console.log(`Grid word list (length 3-7): ${gridWords.length} words.`);
+
+  console.log("Building base-word map ...");
+  const baseMap = buildBaseWordMap(accepted);
+  console.log(`Base-word links: ${Object.keys(baseMap).length}.`);
+
+  const copyrightPath = path.join(path.dirname(scowlDir), "Copyright");
+  let copyrightNotice = "SCOWL copyright notice not found; see http://wordlist.aspell.net/";
+  try {
+    copyrightNotice = await readFile(copyrightPath, "utf8");
+  } catch {
+    // fall back to the placeholder above
   }
 
-  const licence = await readFile(join(sourceDir, 'Copyright'), 'utf8');
-
-  return { accepted, targets, profanity: [...profanity].sort(), licence };
-}
-
-export async function buildEnglishPack(force = false): Promise<void> {
-  if (!force && existsSync(join(PACK_DIR, 'pack.json'))) {
-    return;
-  }
-
-  const sourceDir = await ensureScowlSource();
-  const pack = await buildFromSource(sourceDir);
-
-  await mkdir(PACK_DIR, { recursive: true });
-  await writeFile(join(PACK_DIR, 'accepted.txt'), pack.accepted.join('\n'));
-  await writeFile(join(PACK_DIR, 'targets.json'), JSON.stringify(pack.targets));
-  await writeFile(join(PACK_DIR, 'profanity.txt'), pack.profanity.join('\n'));
-  await writeFile(join(PACK_DIR, 'LICENCE-scowl.txt'), pack.licence);
-  await writeFile(
-    join(PACK_DIR, 'pack.json'),
-    JSON.stringify(
+  const pack: WordPack = {
+    lang: "en",
+    version: 1,
+    accepted,
+    gridWords,
+    baseMap,
+    license: [
       {
-        lang: 'en',
-        source: 'SCOWL',
-        sourceVersion: SCOWL_VERSION,
-        sourceUrl: SCOWL_URL,
-        licenceFile: 'LICENCE-scowl.txt',
-        acceptedMaxSize: ACCEPTED_MAX_SIZE,
-        targetMinSize: TARGET_MIN_SIZE,
-        targetMaxSize: TARGET_MAX_SIZE,
-        acceptedWordCount: pack.accepted.length,
-        targetWordCount: pack.targets.length,
-        profanityWordCount: pack.profanity.length,
-        builtAt: new Date().toISOString(),
+        source: "SCOWL (Spell Checker Oriented Word Lists), by Kevin Atkinson et al.",
+        notice: copyrightNotice,
       },
-      null,
-      2,
-    ),
-  );
+    ],
+  };
 
-  console.log(
-    `Built en pack: ${pack.accepted.length} accepted words, ${pack.targets.length} target words, ${pack.profanity.length} profanity entries.`,
-  );
+  await mkdir(OUT_DIR, { recursive: true });
+  const outPath = path.join(OUT_DIR, "en.json");
+  await writeFile(outPath, JSON.stringify(pack));
+  console.log(`Wrote pack to ${outPath}`);
 }
 
-if (import.meta.main) {
-  await buildEnglishPack(process.argv.includes('--force'));
-}
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -1,11 +1,14 @@
 /**
- * Deterministic seeded PRNG (mulberry32). No dependency on Math.random, so
- * every generator run is reproducible from its seed alone.
+ * Deterministic seeded RNG (mulberry32). Never use Math.random for level generation:
+ * the same seed must always produce the same pool.
  */
-function mulberry32(seed: number): () => number {
+export type Rng = () => number;
+
+export function makeRng(seed: number): Rng {
   let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
+  return function next(): number {
+    state |= 0;
+    state = (state + 0x6d2b79f5) | 0;
     let t = state;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
@@ -13,55 +16,34 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-/** Hash an arbitrary string seed down to a 32-bit int (FNV-1a). */
-function hashSeed(seed: string): number {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < seed.length; i++) {
-    hash ^= seed.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193);
+/** Hash a string seed into a 32-bit int, for human-friendly seeds like "en-band3". */
+export function seedFromString(s: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
   }
-  return hash >>> 0;
+  return h >>> 0;
 }
 
-export class Rng {
-  private next32: () => number;
+export function randomInt(rng: Rng, minInclusive: number, maxInclusive: number): number {
+  return minInclusive + Math.floor(rng() * (maxInclusive - minInclusive + 1));
+}
 
-  constructor(seed: number | string) {
-    const numericSeed = typeof seed === 'string' ? hashSeed(seed) : seed >>> 0;
-    this.next32 = mulberry32(numericSeed);
-  }
+export function pick<T>(rng: Rng, items: readonly T[]): T {
+  const item = items[randomInt(rng, 0, items.length - 1)];
+  if (item === undefined) throw new Error("pick() called on empty array");
+  return item;
+}
 
-  /** Float in [0, 1). */
-  next(): number {
-    return this.next32();
+/** Fisher-Yates shuffle, returns a new array. */
+export function shuffle<T>(rng: Rng, items: readonly T[]): T[] {
+  const arr = items.slice();
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = randomInt(rng, 0, i);
+    const tmp = arr[i]!;
+    arr[i] = arr[j]!;
+    arr[j] = tmp;
   }
-
-  /** Integer in [0, maxExclusive). */
-  int(maxExclusive: number): number {
-    return Math.floor(this.next() * maxExclusive);
-  }
-
-  /** Integer in [min, max]. */
-  range(min: number, max: number): number {
-    return min + this.int(max - min + 1);
-  }
-
-  pick<T>(items: readonly T[]): T {
-    if (items.length === 0) {
-      throw new Error('Rng.pick: empty array');
-    }
-    return items[this.int(items.length)]!;
-  }
-
-  /** Fisher-Yates shuffle, returns a new array. */
-  shuffle<T>(items: readonly T[]): T[] {
-    const result = items.slice();
-    for (let i = result.length - 1; i > 0; i--) {
-      const j = this.int(i + 1);
-      const tmp = result[i]!;
-      result[i] = result[j]!;
-      result[j] = tmp;
-    }
-    return result;
-  }
+  return arr;
 }
