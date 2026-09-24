@@ -1,5 +1,7 @@
 import { DEFAULT_ECONOMY_CONFIG, REVEAL_LETTER_ITEM, REVEAL_WORD_ITEM } from "@word-wheel/core";
 import { applyLedgerEntry, getCoins, getItemCount } from "../db/repository";
+import { platformServices } from "../platform";
+import type { PurchaseResult } from "../platform/types";
 
 export { REVEAL_LETTER_ITEM, REVEAL_WORD_ITEM };
 
@@ -60,4 +62,25 @@ export function hintPrice(itemId: string): number {
 
 export function coinBalance(): number {
   return getCoins();
+}
+
+/**
+ * Plan.md section 16: "Products map to catalog items" (section 13's
+ * ItemCatalogEntry.productId). Buys `itemId` with real money via RevenueCat
+ * instead of coins, adding it to inventory on success.
+ *
+ * UNVERIFIED end to end (see KNOWN_ISSUES.md): no catalog item currently
+ * sets `productId` (section 13's launch catalog is coin-only reveal-letter/
+ * reveal-word), and there is no RevenueCat project to purchase against, so
+ * this function has never actually completed a purchase — it's here so the
+ * mapping is in place once both exist.
+ */
+export async function purchaseItem(itemId: string): Promise<PurchaseResult> {
+  const item = DEFAULT_ECONOMY_CONFIG.itemCatalog.find((i) => i.id === itemId);
+  if (!item?.productId) return { success: false, reason: "error" };
+  const result = await platformServices.purchases.purchase(item.productId);
+  if (result.success) {
+    applyLedgerEntry({ reason: "itemPurchase", coinsDelta: 0, itemId, itemDelta: 1 });
+  }
+  return result;
 }

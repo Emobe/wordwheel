@@ -5,7 +5,7 @@ import { DEFAULT_ECONOMY_CONFIG } from "@word-wheel/core";
 import { useTheme } from "../useTheme";
 import { useAppState } from "../state/AppState";
 import { useTranslation } from "../i18n/i18n";
-import { awardAdReward, buyItem } from "../economy/wallet";
+import { awardAdReward, buyItem, purchaseItem } from "../economy/wallet";
 import { getItemCount } from "../db/repository";
 import { platformServices } from "../platform";
 
@@ -71,14 +71,22 @@ export function ShopScreen() {
               </View>
               <Pressable
                 style={[styles.buyButton, { backgroundColor: theme.tileFilledBg }]}
-                onPress={() => {
-                  buyItem(item.id);
+                onPress={async () => {
+                  // Real-money items (section 16, RevenueCat) bypass the coin
+                  // ledger's own balance check; everything else still buys
+                  // with coins as before. No launch item currently sets
+                  // productId — see purchaseItem()'s doc comment.
+                  if (item.productId) {
+                    await purchaseItem(item.id);
+                  } else {
+                    buyItem(item.id);
+                  }
                   refreshCoins();
                   forceRerender((n) => n + 1);
                 }}
               >
                 <Text style={[styles.buyButtonText, { color: theme.tileFilledText }]}>
-                  {item.coinPrice === 0 ? t("shop.free") : `${item.coinPrice}`}
+                  {item.productId ? item.productId : item.coinPrice === 0 ? t("shop.free") : `${item.coinPrice}`}
                 </Text>
               </Pressable>
             </View>

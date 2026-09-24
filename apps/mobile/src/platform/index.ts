@@ -16,9 +16,9 @@ function buildPlatformServices(): PlatformServices {
   const cfg = DEFAULT_PLATFORM_CONFIG;
   const ads = cfg.adsEnabled ? (require("./live/ads") as typeof import("./live/ads")).liveAds : noopAds;
   const consent = cfg.adsEnabled ? (require("./live/consent") as typeof import("./live/consent")).liveConsent : noopConsent;
-  // Purchases (RevenueCat) live implementation isn't wired up yet — see
-  // KNOWN_ISSUES.md. Always noop until that lands.
-  const purchases = noopPurchases;
+  const purchases = cfg.purchasesEnabled
+    ? (require("./live/purchases") as typeof import("./live/purchases")).livePurchases
+    : noopPurchases;
   return { ads, consent, purchases };
 }
 

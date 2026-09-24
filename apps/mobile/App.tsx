@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppStateProvider } from "./src/state/AppState";
 import { Router } from "./src/screens/Router";
-import { initializeAdsAndConsent } from "./src/platform";
+import { initializeAdsAndConsent, platformServices } from "./src/platform";
 
 export default function App() {
   useEffect(() => {
@@ -12,6 +12,10 @@ export default function App() {
     // ad request. Fire-and-forget: screens read ad readiness via
     // platformServices.ads.isRewardedReady() rather than awaiting this.
     initializeAdsAndConsent();
+    // UNVERIFIED (see KNOWN_ISSUES.md): no RevenueCat project exists yet, so
+    // this configures nothing when purchasesEnabled is off, and warns rather
+    // than silently succeeding when it's on without an API key.
+    platformServices.purchases.initialize();
   }, []);
 
   return (
