@@ -36,7 +36,6 @@ export function GameScreen() {
     settings,
     coins,
     refreshCoins,
-    levelRunToken,
     currentLevel,
     setCurrentLevel,
     foundWords,
@@ -44,16 +43,28 @@ export function GameScreen() {
     foundBonusWords,
     setFoundBonusWords,
     setLastCoinsEarned,
+    wheelArrangement: arrangement,
+    setWheelArrangement: setArrangement,
+    hintedCells,
+    setHintedCells,
   } = useAppState();
 
-  const [arrangement, setArrangement] = useState<string[]>([]);
   const [previewWord, setPreviewWord] = useState("");
   const [shakeToken, setShakeToken] = useState(0);
   const [gridArea, setGridArea] = useState({ width: 0, height: 0 });
-  const [hintedCells, setHintedCells] = useState<Set<string>>(new Set());
 
-  // Fresh level pick whenever we (re-)enter the game or a level is completed.
+  // Picks a level only when there isn't one already (first entry, or right
+  // after startNewLevelRun() cleared it in AppState on level completion) —
+  // NOT on every mount. Navigating away (e.g. to Settings) and back remounts
+  // this component; a first attempt at this fix used a GameScreen-local
+  // useRef to track "already picked", which doesn't work because a ref is
+  // just as fresh on remount as useState is — it only survives re-renders of
+  // the SAME mounted instance, not an unmount+remount. The actual fix has to
+  // live in state that outlives the component, which is exactly why
+  // currentLevel (and now the "should I pick a new one" decision derived
+  // from it) lives in AppState rather than here.
   useEffect(() => {
+    if (currentLevel) return;
     const next = pickCurrentLevel(settings.wordLanguage);
     setCurrentLevel(next);
     setArrangement(next ? [...next.level.wheel] : []);
@@ -62,7 +73,7 @@ export function GameScreen() {
     setFoundBonusWords(new Set());
     setHintedCells(new Set());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [levelRunToken, settings.wordLanguage]);
+  }, [currentLevel, settings.wordLanguage]);
 
   const level = currentLevel?.level ?? null;
   const bonusWords = currentLevel?.bonusWords ?? [];
@@ -128,7 +139,7 @@ export function GameScreen() {
     }
     if (candidates.length === 0) return;
     const pick = candidates[Math.floor(Math.random() * candidates.length)]!;
-    setHintedCells((prev) => new Set(prev).add(pick));
+    setHintedCells(new Set(hintedCells).add(pick));
   }
 
   function handleRevealWord() {
@@ -205,7 +216,7 @@ export function GameScreen() {
         <Wheel letters={arrangement} theme={theme} onSubmit={handleSubmit} onSelectionChange={setPreviewWord} />
       </View>
 
-      <ShuffleButton theme={theme} onPress={() => setArrangement((prev) => shuffled(prev))} />
+      <ShuffleButton theme={theme} onPress={() => setArrangement(shuffled(arrangement))} />
     </SafeAreaView>
   );
 }

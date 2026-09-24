@@ -24,8 +24,7 @@ interface AppStateValue {
   coins: number;
   refreshCoins: () => void;
   playerId: string;
-  /** Bumped whenever the game state (grid/wheel/bonus words) should reset for a fresh level. */
-  levelRunToken: number;
+  /** Clears currentLevel (and the rest of the in-progress run state) so GameScreen picks a fresh level next time it needs one. Call this only when a level actually finishes — never on ordinary navigation, or it reintroduces the re-roll-on-remount bug this state shape exists to avoid. */
   startNewLevelRun: () => void;
 
   /** Shared across GameScreen/BonusWordsScreen/LevelCompleteScreen so they all see the same live run. */
@@ -37,6 +36,13 @@ interface AppStateValue {
   setFoundBonusWords: (words: ReadonlySet<string>) => void;
   lastCoinsEarned: number;
   setLastCoinsEarned: (n: number) => void;
+  /** Wheel letter order and hinted-but-unfound cells — also local-looking state that must
+   * survive a GameScreen remount (e.g. Settings and back) instead of resetting, same reason
+   * currentLevel/foundWords live here rather than as GameScreen's own useState. */
+  wheelArrangement: string[];
+  setWheelArrangement: (letters: string[]) => void;
+  hintedCells: ReadonlySet<string>;
+  setHintedCells: (cells: ReadonlySet<string>) => void;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -46,11 +52,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [history, setHistory] = useState<ScreenName[]>([]);
   const [settings, setSettingsState] = useState<Settings>(() => getSettings());
   const [coins, setCoins] = useState<number>(() => coinBalance());
-  const [levelRunToken, setLevelRunToken] = useState(0);
   const [currentLevel, setCurrentLevel] = useState<CurrentLevel | null>(null);
   const [foundWords, setFoundWords] = useState<ReadonlySet<string>>(new Set());
   const [foundBonusWords, setFoundBonusWords] = useState<ReadonlySet<string>>(new Set());
   const [lastCoinsEarned, setLastCoinsEarned] = useState(0);
+  const [wheelArrangement, setWheelArrangement] = useState<string[]>([]);
+  const [hintedCells, setHintedCells] = useState<ReadonlySet<string>>(new Set());
   const playerId = useMemo(() => getPlayerId(), []);
 
   const goTo = useCallback(
@@ -80,7 +87,13 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setSettingsState(getSettings());
   }, []);
   const refreshCoins = useCallback(() => setCoins(coinBalance()), []);
-  const startNewLevelRun = useCallback(() => setLevelRunToken((t) => t + 1), []);
+  const startNewLevelRun = useCallback(() => {
+    setCurrentLevel(null);
+    setFoundWords(new Set());
+    setFoundBonusWords(new Set());
+    setWheelArrangement([]);
+    setHintedCells(new Set());
+  }, []);
 
   const value: AppStateValue = {
     screen,
@@ -92,7 +105,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     coins,
     refreshCoins,
     playerId,
-    levelRunToken,
     startNewLevelRun,
     currentLevel,
     setCurrentLevel,
@@ -102,6 +114,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setFoundBonusWords,
     lastCoinsEarned,
     setLastCoinsEarned,
+    wheelArrangement,
+    setWheelArrangement,
+    hintedCells,
+    setHintedCells,
   };
 
   return (
