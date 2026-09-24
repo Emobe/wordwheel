@@ -2,7 +2,8 @@
   "name": "word-wheel",
   "private": true,
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "build-pack": "bun run packages/tools/src/scowl/build-pack.ts",
@@ -15,5 +16,6 @@
   "devDependencies": {
     "@types/bun": "^1.4.2",
     "typescript": "^5.6.0"
-  }
+  },
+  "trustedDependencies": ["@shopify/react-native-skia"]
 }

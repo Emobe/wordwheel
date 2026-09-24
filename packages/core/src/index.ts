@@ -7,3 +7,7 @@ export * from "./difficulty.js";
 export * from "./generator.js";
 export * from "./profanity.js";
 export * from "./config.js";
+export * from "./difficulty-curve.js";
+export * from "./level-selection.js";
+export * from "./chapters.js";
+export * from "./economy.js";

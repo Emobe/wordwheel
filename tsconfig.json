@@ -16,5 +16,6 @@
   "references": [
     { "path": "packages/core" },
     { "path": "packages/tools" }
-  ]
+  ],
+  "include": []
 }

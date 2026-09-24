@@ -101,9 +101,12 @@ Runs offline in `packages/tools`, with the logic in `packages/core`. Determinist
 2. Find every accepted word spellable from those tiles.
 3. Choose grid words to hit a target difficulty.
 4. Lay out the grid within the size limits (section 8): longest word first, then crossings with backtracking. Score layouts on compactness, number of crossings and shape.
-5. Optionally mark one grid word as a coin word (section 13).
-6. Validate: every grid word spellable from the wheel, grid connected, no accidental words formed by adjacent tiles, blocklist check, at most one form of each base word in the grid, grid within size limits.
-7. Save the level with its difficulty score into the pool for its difficulty band.
+5. If no layout fits the size limits, retry: try a different subset of grid words from step 3, then a different wheel word from step 1, before falling back to a smaller grid word count for that band. Batch generation has no time pressure, so retrying is cheap.
+6. Optionally mark one grid word as a coin word (section 13).
+7. Validate: every grid word spellable from the wheel, grid connected, no accidental words formed by adjacent tiles, blocklist check, at most one form of each base word in the grid, grid within size limits.
+8. Save the level with its difficulty score into the pool for its difficulty band.
+
+This is more tractable than general crossword generation, because every grid word is spelled from the same wheel, so crossing letters are common by construction, the word set is chosen rather than fixed, and sparse layouts are normal for this genre rather than a failure. The generator report (Phase 0 gate) includes the retry rate, so a band that struggles to hit its size limit shows up before any levels ship.
 
 The output is a **pool of levels per difficulty band per language**, far larger than anyone plays through. There is no fixed level 1, level 2 sequence. More pools can be downloaded later.
 
@@ -135,26 +138,27 @@ Every level must fit on a small phone without scrolling and stay readable. Nothi
 
 Design target: a 360 by 640 dp portrait screen, a common compact Android size. The wheel takes the lower part of the screen, so the grid gets roughly the top half. For comparison, a typical Wordscapes grid is around 10 columns by 8 rows.
 
-Limits scale with the size of the wheel, so levels with longer words get a slightly larger grid. Starting values, all in generator config and tuned on a real device in Phase 1:
+**Measured on device in Phase 1.** At true 360x640dp with the actual chrome (status bar, header, bonus line, word preview, shuffle button, margins) and the wheel at its 168dp floor, the grid area is 328x203dp. At the 28dp tile floor with 2dp gaps, that fits at most 9 columns by 6 rows (196dp of the 203dp used, 7dp to spare). One more row (9x7) needs 208dp and clips by 5dp, so 6 rows is the hard ceiling at this screen size, not the earlier two-tier estimate.
 
-| Wheel size | Max columns | Max rows | Tile width on the 360 dp design target |
-|---|---|---|---|
-| 3-6 tiles | 10 | 9 | about 31 dp |
-| 7 tiles | 11 | 10 | about 28 dp |
+| Max columns | Max rows | Tile width on the 360 dp design target |
+|---|---|---|
+| 9 | 6 | about 28 dp |
 
-Tile widths assume 16 dp side margins and 2 dp gaps between tiles. At 12 columns tiles would drop to about 25 dp, which is below the readability floor, so 11 by 10 is the ceiling for any level.
+One value for every wheel size, not scaled by wheel size. A single grid word placed vertically can use at most 6 tiles, so a 7-letter wheel word must be placed horizontally (9 columns comfortably covers it) and a second 7-letter word requiring vertical placement is out of scope: the generator rejects that layout and retries with a different word choice, rather than producing a grid that overflows.
 
-Other limits for every size:
+Other limits:
 
-| Setting | Starting value | Why |
+| Setting | Value | Why |
 |---|---|---|
 | Shape | rows no more than 1.2 times columns, and columns no more than 1.6 times rows | Stops very tall or very wide grids |
 | Min tile size | 28 dp on the design target | Readability floor |
 
+This is smaller than the original two-tier estimate (10x9 / 11x10), which was based on tile size alone and didn't account for how much space the fixed UI chrome and the wheel actually take up. Grid size can grow later once this is tested on a second, larger device, since a bigger screen has more real budget to spend.
+
 Rules:
 
 - The generator rejects any layout outside these limits. They are checked in validation, not left to the app.
-- Limits must allow the longest wheel word (7 tiles) in either direction.
+- The wheel word (3 to 7 tiles) must always be placeable horizontally, which 9 columns guarantees. A second word longer than 6 tiles placed vertically is not guaranteed to fit and is rejected rather than allowed to overflow.
 - The app scales tiles to fill the available grid area on bigger screens, up to a maximum tile size so small grids do not look oversized.
 - Letters on tiles scale with the tile size.
 - If a limit changes, regenerate the pools. Old levels are never stretched to fit.

@@ -1,0 +1,61 @@
+/**
+ * Plan.md section 13: everything is data so items and prices can change
+ * without code changes. Pure config + types here; the actual wallet/ledger
+ * storage is SQLite (section 14), which is I/O and lives in apps/mobile —
+ * this package stays I/O-free per its own layout rule.
+ */
+export interface ItemCatalogEntry {
+  id: string;
+  type: "consumable" | "cosmetic" | "unlock";
+  coinPrice: number;
+  /** Real-money product ID, mapped to a store product later (section 16). Unset while purchases are off. */
+  productId?: string;
+}
+
+export interface EarningRules {
+  levelComplete: number;
+  bonusWordFound: number;
+  coinWordFound: number;
+  dailyReward: number;
+}
+
+export interface EconomyConfig {
+  earningRules: EarningRules;
+  itemCatalog: ItemCatalogEntry[];
+}
+
+export const REVEAL_LETTER_ITEM = "reveal-letter";
+export const REVEAL_WORD_ITEM = "reveal-word";
+
+/** "Launch prices: every coin price set to 0, so everything is free." Bonus-word/coin-word/daily-reward earnings are also 0 for now per section 13 ("slots... set to 0 for now"); only level completion pays out. */
+export const DEFAULT_ECONOMY_CONFIG: EconomyConfig = {
+  earningRules: {
+    levelComplete: 10,
+    bonusWordFound: 0,
+    coinWordFound: 0,
+    dailyReward: 0,
+  },
+  itemCatalog: [
+    { id: REVEAL_LETTER_ITEM, type: "consumable", coinPrice: 0 },
+    { id: REVEAL_WORD_ITEM, type: "consumable", coinPrice: 0 },
+  ],
+};
+
+export type LedgerReason =
+  | "levelComplete"
+  | "bonusWordFound"
+  | "coinWordFound"
+  | "dailyReward"
+  | "itemPurchase"
+  | "itemUse";
+
+/** One row of the change log (section 14): every coin/item change goes through one function (apps/mobile's ledger.ts) and is written here. */
+export interface LedgerEntry {
+  id: string;
+  timestamp: number;
+  reason: LedgerReason;
+  coinsDelta: number;
+  itemId?: string;
+  itemDelta?: number;
+  synced: boolean;
+}

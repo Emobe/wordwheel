@@ -1,0 +1,33 @@
+{
+  "name": "@word-wheel/mobile",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "export": "expo export",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shopify/react-native-skia": "2.6.2",
+    "@word-wheel/core": "workspace:*",
+    "expo": "~57.0.24",
+    "expo-audio": "~57.0.5",
+    "expo-dev-client": "~57.0.19",
+    "expo-haptics": "~57.0.3",
+    "expo-sqlite": "~57.0.3",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-worklets": "0.10.4"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.2",
+    "babel-preset-expo": "~57.0.12",
+    "typescript": "~6.0.3"
+  }
+}

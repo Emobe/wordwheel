@@ -4,6 +4,15 @@ See `Plan.md` for the full product plan. This file documents the repo as it
 exists after Phase 0 (generator spike, section 19.0): pack builder, level
 generator, and CLI tooling. No mobile app yet.
 
+## Verification
+
+When asked to verify something, give current evidence in that response: real
+numbers, a real command run this turn, or a fresh screenshot. Referring back
+to an earlier summary is not verification. If something hasn't actually been
+re-checked, say so plainly rather than treating "already covered" as done.
+Never state a measurement or number without having actually derived or
+measured it; if it's an estimate, say estimate.
+
 ## Layout
 
 ```
