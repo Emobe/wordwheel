@@ -14,6 +14,11 @@ export function awardLevelComplete() {
   applyLedgerEntry({ reason: "levelComplete", coinsDelta: DEFAULT_ECONOMY_CONFIG.earningRules.levelComplete });
 }
 
+/** Plan.md section 16: "Rewarded ads for coins or hints." Called after platformServices.ads.showRewarded() resolves { earned: true }. */
+export function awardAdReward() {
+  applyLedgerEntry({ reason: "adReward", coinsDelta: DEFAULT_ECONOMY_CONFIG.earningRules.adReward });
+}
+
 export function canAfford(itemId: string): boolean {
   return getCoins() >= priceOf(itemId);
 }

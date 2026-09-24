@@ -226,3 +226,5 @@ which requires Windows Developer Mode (or admin) to create; without it,
 package-name import fails at runtime. Relative imports sidestep this
 entirely. If a real npm-style workspace dependency is needed later (e.g. for
 Metro resolving `@word-wheel/core` from `apps/mobile`), revisit this.
+
+Run Android/Gradle builds with a generous timeout in the foreground rather than backgrounding them and polling for completion. Each check on a background process is a separate round trip, so blocking once and waiting for the real result is cheaper than checking repeatedly. Only background a command that genuinely needs to stay running, such as Metro or an emulator, and check on it a small, fixed number of times, not in a loop.

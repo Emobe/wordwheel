@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DEFAULT_ECONOMY_CONFIG } from "@word-wheel/core";
 import { useTheme } from "../useTheme";
 import { useAppState } from "../state/AppState";
 import { useTranslation } from "../i18n/i18n";
-import { buyItem } from "../economy/wallet";
+import { awardAdReward, buyItem } from "../economy/wallet";
 import { getItemCount } from "../db/repository";
+import { platformServices } from "../platform";
 
 const ITEM_NAME_KEYS: Record<string, string> = {
   "reveal-letter": "game.hintLetter",
@@ -18,6 +19,21 @@ export function ShopScreen() {
   const { back, coins, refreshCoins } = useAppState();
   const t = useTranslation();
   const [, forceRerender] = useState(0);
+  const [adReady, setAdReady] = useState(platformServices.ads.isRewardedReady());
+
+  useEffect(() => {
+    const id = setInterval(() => setAdReady(platformServices.ads.isRewardedReady()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  async function handleWatchAd() {
+    const result = await platformServices.ads.showRewarded();
+    if (result.earned) {
+      awardAdReward();
+      refreshCoins();
+    }
+    setAdReady(platformServices.ads.isRewardedReady());
+  }
 
   return (
     <SafeAreaView style={[styles.screen, { backgroundColor: theme.background }]} edges={["top", "bottom"]}>
@@ -29,6 +45,17 @@ export function ShopScreen() {
         <Text style={[styles.title, { color: theme.text }]}>{t("shop.title")}</Text>
         <Text style={[styles.coins, { color: theme.accent }]}>{t("shop.coins", { count: coins })}</Text>
       </View>
+
+      {adReady && (
+        <Pressable
+          style={[styles.watchAdButton, { backgroundColor: theme.tileFilledBg }]}
+          onPress={handleWatchAd}
+        >
+          <Text style={[styles.buyButtonText, { color: theme.tileFilledText }]}>
+            {t("shop.watchAd", { count: DEFAULT_ECONOMY_CONFIG.earningRules.adReward })}
+          </Text>
+        </Pressable>
+      )}
 
       <View style={styles.list}>
         {DEFAULT_ECONOMY_CONFIG.itemCatalog.map((item) => {
@@ -66,7 +93,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, paddingHorizontal: 20 },
   backRow: { paddingVertical: 12 },
   backText: { fontSize: 14 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 20 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 },
+  watchAdButton: { paddingVertical: 12, borderRadius: 14, alignItems: "center", marginBottom: 16 },
   title: { fontSize: 24, fontWeight: "800" },
   coins: { fontSize: 16, fontWeight: "700" },
   list: { gap: 10 },

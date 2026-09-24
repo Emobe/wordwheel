@@ -17,6 +17,8 @@ export interface EarningRules {
   bonusWordFound: number;
   coinWordFound: number;
   dailyReward: number;
+  /** Plan.md section 16: "Rewarded ads for coins or hints." Coins granted for completing one rewarded ad. */
+  adReward: number;
 }
 
 export interface EconomyConfig {
@@ -27,13 +29,14 @@ export interface EconomyConfig {
 export const REVEAL_LETTER_ITEM = "reveal-letter";
 export const REVEAL_WORD_ITEM = "reveal-word";
 
-/** "Launch prices: every coin price set to 0, so everything is free." Bonus-word/coin-word/daily-reward earnings are also 0 for now per section 13 ("slots... set to 0 for now"); only level completion pays out. */
+/** "Launch prices: every coin price set to 0, so everything is free." Bonus-word/coin-word/daily-reward earnings are also 0 for now per section 13 ("slots... set to 0 for now"); only level completion pays out today. `adReward` is section 16's rewarded-ad payout — also dormant at launch since ads are off by PlatformConfig.adsEnabled, not by this being 0. */
 export const DEFAULT_ECONOMY_CONFIG: EconomyConfig = {
   earningRules: {
     levelComplete: 10,
     bonusWordFound: 0,
     coinWordFound: 0,
     dailyReward: 0,
+    adReward: 20,
   },
   itemCatalog: [
     { id: REVEAL_LETTER_ITEM, type: "consumable", coinPrice: 0 },
@@ -46,6 +49,7 @@ export type LedgerReason =
   | "bonusWordFound"
   | "coinWordFound"
   | "dailyReward"
+  | "adReward"
   | "itemPurchase"
   | "itemUse";
 

@@ -1,4 +1,7 @@
 {
+  "react-native-google-mobile-ads": {
+    "android_app_id": "ca-app-pub-3940256099942544~3347511713"
+  },
   "expo": {
     "name": "Word Wheel",
     "slug": "word-wheel",
@@ -25,7 +28,13 @@
     "plugins": [
       "expo-sqlite",
       "expo-audio",
-      "./plugins/withCmakeStagingPathFix.js"
+      "./plugins/withCmakeStagingPathFix.js",
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "ca-app-pub-3940256099942544~3347511713"
+        }
+      ]
     ]
   }
 }

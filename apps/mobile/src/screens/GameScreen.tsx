@@ -15,6 +15,7 @@ import { pickCurrentLevel, completeLevel } from "../game/progression";
 import { REVEAL_LETTER_ITEM, REVEAL_WORD_ITEM, awardLevelComplete, hintPrice, spendOnHint } from "../economy/wallet";
 import { playSound } from "../sound";
 import { hapticWordFound, hapticWrong } from "../haptics";
+import { platformServices } from "../platform";
 
 /** Cosmetic wheel-circle shuffle only — not level generation, so this is
  * fine to be non-seeded unlike anything in packages/core. */
@@ -126,6 +127,9 @@ export function GameScreen() {
     setLastCoinsEarned(10); // DEFAULT_ECONOMY_CONFIG.earningRules.levelComplete, see wallet.ts
     completeLevel(settings.wordLanguage, currentLevel);
     goTo("levelComplete");
+    // Plan.md section 16: "capped interstitials." Fire-and-forget so a slow
+    // or unavailable ad never blocks the level-complete navigation above.
+    void platformServices.ads.showInterstitialIfAllowed();
   }
 
   function handleRevealLetter() {

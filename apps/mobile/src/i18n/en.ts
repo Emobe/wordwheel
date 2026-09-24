@@ -37,6 +37,8 @@ const en = {
   "shop.buy": "Get",
   "shop.owned": "Owned: {count}",
   "shop.free": "Free",
+  "shop.watchAd": "Watch ad for {count} coins",
+  "shop.watchAdLoading": "Ad not ready yet",
 
   "settings.title": "Settings",
   "settings.uiLanguage": "App language",
