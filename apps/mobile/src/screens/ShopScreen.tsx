@@ -11,7 +11,7 @@ import { platformServices } from "../platform";
 
 const ITEM_NAME_KEYS: Record<string, string> = {
   "reveal-letter": "game.hintLetter",
-  "reveal-word": "game.hintWord",
+  "pick-letter": "game.hintPickLetter",
 };
 
 export function ShopScreen() {

@@ -4,23 +4,30 @@ import type { Theme } from "../theme";
 interface HintButtonsProps {
   theme: Theme;
   letterLabel: string;
-  wordLabel: string;
+  pickLabel: string;
   letterCost: number;
-  wordCost: number;
+  pickCost: number;
   onRevealLetter: () => void;
-  onRevealWord: () => void;
+  onTogglePickLetter: () => void;
+  pickActive: boolean;
   disabled: boolean;
 }
 
-/** Plan.md section 12: "hint button showing its cost." Two buttons (reveal letter / reveal word), each showing its coin price. */
+/**
+ * Plan.md section 12: "hint button showing its cost." Two buttons: reveal
+ * letter (sequentially reveals an auto-picked word, one letter per use) and
+ * pick letter (arms tap-to-reveal mode — the next empty grid cell the
+ * player taps is what gets revealed).
+ */
 export function HintButtons({
   theme,
   letterLabel,
-  wordLabel,
+  pickLabel,
   letterCost,
-  wordCost,
+  pickCost,
   onRevealLetter,
-  onRevealWord,
+  onTogglePickLetter,
+  pickActive,
   disabled,
 }: HintButtonsProps) {
   return (
@@ -35,11 +42,20 @@ export function HintButtons({
       </Pressable>
       <Pressable
         disabled={disabled}
-        onPress={onRevealWord}
-        style={[styles.button, { backgroundColor: theme.surface, borderColor: theme.tileEmptyBorder, opacity: disabled ? 0.5 : 1 }]}
+        onPress={onTogglePickLetter}
+        style={[
+          styles.button,
+          {
+            backgroundColor: pickActive ? theme.accent : theme.surface,
+            borderColor: pickActive ? theme.accent : theme.tileEmptyBorder,
+            opacity: disabled ? 0.5 : 1,
+          },
+        ]}
       >
-        <Text style={[styles.label, { color: theme.text }]}>{wordLabel}</Text>
-        <Text style={[styles.cost, { color: theme.accent }]}>{wordCost === 0 ? "Free" : wordCost}</Text>
+        <Text style={[styles.label, { color: pickActive ? theme.tileFilledText : theme.text }]}>{pickLabel}</Text>
+        <Text style={[styles.cost, { color: pickActive ? theme.tileFilledText : theme.accent }]}>
+          {pickCost === 0 ? "Free" : pickCost}
+        </Text>
       </Pressable>
     </View>
   );

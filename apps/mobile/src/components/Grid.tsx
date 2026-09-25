@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import type { Grid as GridType } from "@word-wheel/core";
 import { TILE_GAP, gridCells, tileSize } from "../gridGeometry";
@@ -73,14 +73,16 @@ function AnimatedTile({ size, letter, state, theme }: AnimatedTileProps) {
 interface GridProps {
   grid: GridType;
   foundWords: ReadonlySet<string>;
-  /** Cell keys ("x,y") revealed by a reveal-letter hint but not yet part of a found word. */
+  /** Cell keys ("x,y") revealed by a hint but not yet part of a found word. */
   hintedCells?: ReadonlySet<string>;
   theme: Theme;
   availableWidth: number;
   availableHeight: number;
+  /** When set, empty cells become tappable — the pick-letter hint's "choose which cell to reveal" mode. */
+  onCellPress?: (key: string) => void;
 }
 
-export function GridBoard({ grid, foundWords, hintedCells, theme, availableWidth, availableHeight }: GridProps) {
+export function GridBoard({ grid, foundWords, hintedCells, theme, availableWidth, availableHeight, onCellPress }: GridProps) {
   const size = tileSize(grid, availableWidth, availableHeight);
   const cells = gridCells(grid);
   const gap = TILE_GAP;
@@ -97,6 +99,8 @@ export function GridBoard({ grid, foundWords, hintedCells, theme, availableWidth
     <View style={[styles.board, { width: boardWidth, height: boardHeight }]}>
       {[...cells.values()].map((cell) => {
         const key = `${cell.x},${cell.y}`;
+        const state = cellState(key, cell.wordIndices);
+        const tile = <AnimatedTile size={size} letter={cell.letter} state={state} theme={theme} />;
         return (
           <View
             key={key}
@@ -106,7 +110,11 @@ export function GridBoard({ grid, foundWords, hintedCells, theme, availableWidth
               top: cell.y * (size + gap),
             }}
           >
-            <AnimatedTile size={size} letter={cell.letter} state={cellState(key, cell.wordIndices)} theme={theme} />
+            {onCellPress && state === "empty" ? (
+              <Pressable onPress={() => onCellPress(key)}>{tile}</Pressable>
+            ) : (
+              tile
+            )}
           </View>
         );
       })}

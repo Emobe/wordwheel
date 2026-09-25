@@ -43,6 +43,9 @@ interface AppStateValue {
   setWheelArrangement: (letters: string[]) => void;
   hintedCells: ReadonlySet<string>;
   setHintedCells: (cells: ReadonlySet<string>) => void;
+  /** Which unfound grid word the sequential reveal-letter hint is currently working through. */
+  hintTargetWord: string | null;
+  setHintTargetWord: (word: string | null) => void;
 }
 
 const AppStateContext = createContext<AppStateValue | null>(null);
@@ -58,6 +61,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [lastCoinsEarned, setLastCoinsEarned] = useState(0);
   const [wheelArrangement, setWheelArrangement] = useState<string[]>([]);
   const [hintedCells, setHintedCells] = useState<ReadonlySet<string>>(new Set());
+  const [hintTargetWord, setHintTargetWord] = useState<string | null>(null);
   const playerId = useMemo(() => getPlayerId(), []);
 
   const goTo = useCallback(
@@ -93,6 +97,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setFoundBonusWords(new Set());
     setWheelArrangement([]);
     setHintedCells(new Set());
+    setHintTargetWord(null);
   }, []);
 
   const value: AppStateValue = {
@@ -118,6 +123,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setWheelArrangement,
     hintedCells,
     setHintedCells,
+    hintTargetWord,
+    setHintTargetWord,
   };
 
   return (

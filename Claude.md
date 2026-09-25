@@ -231,3 +231,5 @@ Run Android/Gradle builds with a generous timeout in the foreground rather than 
 
 
 Create branches for new features/fixes. Commit when you need to.
+
+If the changes are just js/tx, do NOT wait for gradle builds when testing. Metro is running.
