@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Canvas, Path, Skia } from "@shopify/react-native-skia";
@@ -32,6 +32,14 @@ export function Wheel({ letters, theme, onSubmit, onSelectionChange }: WheelProp
   // in balance instead of the wheel silently starving the grid.
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [selected, setSelected] = useState<number[]>([]);
+  // Gesture callbacks need the latest selection synchronously, and calling
+  // onSelectionChange/onSubmit (which set state in GameScreen) from inside
+  // the setSelected updater function ran them during Wheel's render phase —
+  // "Cannot update a component while rendering a different component".
+  // This ref is the authoritative selection for gesture logic; setSelected
+  // only mirrors it for rendering, and the parent callbacks fire as plain
+  // calls in the event handler, not inside a state updater.
+  const selectedRef = useRef<number[]>([]);
 
   const wheelSize =
     containerSize.width > 0 && containerSize.height > 0
@@ -65,29 +73,33 @@ export function Wheel({ letters, theme, onSubmit, onSelectionChange }: WheelProp
     (x: number, y: number) => {
       const idx = hitTest(x, y);
       if (idx === null) return;
-      setSelected((prev) => {
-        if (prev.length > 0 && prev[prev.length - 1] === idx) return prev;
+      const prev = selectedRef.current;
+      let next = prev;
+      let isNewLetter = false;
+      if (prev.length > 0 && prev[prev.length - 1] === idx) {
+        return;
+      } else if (prev.length > 1 && prev[prev.length - 2] === idx) {
         // Dragging back onto the previous letter un-selects it.
-        if (prev.length > 1 && prev[prev.length - 2] === idx) {
-          const next = prev.slice(0, -1);
-          onSelectionChange(next.map((i) => letters[i]).join(""));
-          return next;
-        }
-        if (prev.includes(idx)) return prev;
-        const next = [...prev, idx];
-        hapticTap();
-        onSelectionChange(next.map((i) => letters[i]).join(""));
-        return next;
-      });
+        next = prev.slice(0, -1);
+      } else if (prev.includes(idx)) {
+        return;
+      } else {
+        next = [...prev, idx];
+        isNewLetter = true;
+      }
+      selectedRef.current = next;
+      setSelected(next);
+      if (isNewLetter) hapticTap();
+      onSelectionChange(next.map((i) => letters[i]).join(""));
     },
     [hitTest, letters, onSelectionChange],
   );
 
   const handleEnd = useCallback(() => {
-    setSelected((prev) => {
-      if (prev.length > 0) onSubmit(prev.map((i) => letters[i]).join(""));
-      return [];
-    });
+    const prev = selectedRef.current;
+    selectedRef.current = [];
+    setSelected([]);
+    if (prev.length > 0) onSubmit(prev.map((i) => letters[i]).join(""));
     onSelectionChange("");
   }, [letters, onSubmit, onSelectionChange]);
 
