@@ -1,9 +1,9 @@
-import { DEFAULT_ECONOMY_CONFIG, REVEAL_LETTER_ITEM, REVEAL_WORD_ITEM } from "@word-wheel/core";
+import { DEFAULT_ECONOMY_CONFIG, PICK_LETTER_ITEM, REVEAL_LETTER_ITEM } from "@word-wheel/core";
 import { applyLedgerEntry, getCoins, getItemCount } from "../db/repository";
 import { platformServices } from "../platform";
 import type { PurchaseResult } from "../platform/types";
 
-export { REVEAL_LETTER_ITEM, REVEAL_WORD_ITEM };
+export { PICK_LETTER_ITEM, REVEAL_LETTER_ITEM };
 
 function priceOf(itemId: string): number {
   const item = DEFAULT_ECONOMY_CONFIG.itemCatalog.find((i) => i.id === itemId);
@@ -71,7 +71,7 @@ export function coinBalance(): number {
  *
  * UNVERIFIED end to end (see KNOWN_ISSUES.md): no catalog item currently
  * sets `productId` (section 13's launch catalog is coin-only reveal-letter/
- * reveal-word), and there is no RevenueCat project to purchase against, so
+ * pick-letter), and there is no RevenueCat project to purchase against, so
  * this function has never actually completed a purchase — it's here so the
  * mapping is in place once both exist.
  */

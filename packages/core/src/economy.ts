@@ -26,8 +26,10 @@ export interface EconomyConfig {
   itemCatalog: ItemCatalogEntry[];
 }
 
+/** Sequentially reveals one letter of an auto-picked unfound word per use — see GameScreen.handleRevealLetter. */
 export const REVEAL_LETTER_ITEM = "reveal-letter";
-export const REVEAL_WORD_ITEM = "reveal-word";
+/** Reveals whichever unfound grid cell the player taps — see GameScreen.handleCellPick. */
+export const PICK_LETTER_ITEM = "pick-letter";
 
 /** "Launch prices: every coin price set to 0, so everything is free." Bonus-word/coin-word/daily-reward earnings are also 0 for now per section 13 ("slots... set to 0 for now"); only level completion pays out today. `adReward` is section 16's rewarded-ad payout — also dormant at launch since ads are off by PlatformConfig.adsEnabled, not by this being 0. */
 export const DEFAULT_ECONOMY_CONFIG: EconomyConfig = {
@@ -40,7 +42,7 @@ export const DEFAULT_ECONOMY_CONFIG: EconomyConfig = {
   },
   itemCatalog: [
     { id: REVEAL_LETTER_ITEM, type: "consumable", coinPrice: 0 },
-    { id: REVEAL_WORD_ITEM, type: "consumable", coinPrice: 0 },
+    { id: PICK_LETTER_ITEM, type: "consumable", coinPrice: 0 },
   ],
 };
 

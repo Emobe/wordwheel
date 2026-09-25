@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import type { GridWordPlacement } from "@word-wheel/core";
 import { useTheme } from "../useTheme";
 import { useAppState } from "../state/AppState";
 import { useTranslation } from "../i18n/i18n";
@@ -10,9 +11,9 @@ import { Wheel } from "../components/Wheel";
 import { ShuffleButton } from "../components/ShuffleButton";
 import { GameHeader } from "../components/GameHeader";
 import { HintButtons } from "../components/HintButtons";
-import { gridCells } from "../gridGeometry";
+import { cellsForWord } from "../gridGeometry";
 import { pickCurrentLevel, completeLevel } from "../game/progression";
-import { REVEAL_LETTER_ITEM, REVEAL_WORD_ITEM, awardLevelComplete, hintPrice, spendOnHint } from "../economy/wallet";
+import { PICK_LETTER_ITEM, REVEAL_LETTER_ITEM, awardLevelComplete, hintPrice, spendOnHint } from "../economy/wallet";
 import { playSound } from "../sound";
 import { hapticWordFound, hapticWrong } from "../haptics";
 import { platformServices } from "../platform";
@@ -48,11 +49,18 @@ export function GameScreen() {
     setWheelArrangement: setArrangement,
     hintedCells,
     setHintedCells,
+    hintTargetWord,
+    setHintTargetWord,
   } = useAppState();
 
   const [previewWord, setPreviewWord] = useState("");
   const [shakeToken, setShakeToken] = useState(0);
   const [gridArea, setGridArea] = useState({ width: 0, height: 0 });
+  // Armed by the "pick letter" hint button — while true, the next empty grid
+  // cell the player taps is what gets revealed. Transient UI state: fine to
+  // reset on remount, unlike hintedCells/hintTargetWord which track hint
+  // progress that must survive navigating away and back.
+  const [pickLetterMode, setPickLetterMode] = useState(false);
 
   // Picks a level only when there isn't one already (first entry, or right
   // after startNewLevelRun() cleared it in AppState on level completion) —
@@ -73,6 +81,8 @@ export function GameScreen() {
     setFoundWords(new Set());
     setFoundBonusWords(new Set());
     setHintedCells(new Set());
+    setHintTargetWord(null);
+    setPickLetterMode(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentLevel, settings.wordLanguage]);
 
@@ -81,14 +91,6 @@ export function GameScreen() {
 
   const gridWordSet = useMemo(() => new Set(level?.grid.words.map((w) => w.w) ?? []), [level]);
   const bonusWordSet = useMemo(() => new Set(bonusWords), [bonusWords]);
-  const cellsByWordIndex = useMemo(() => {
-    if (!level) return new Map<string, number[]>();
-    const map = new Map<string, number[]>();
-    for (const cell of gridCells(level.grid).values()) {
-      map.set(`${cell.x},${cell.y}`, cell.wordIndices);
-    }
-    return map;
-  }, [level]);
 
   function handleSubmit(word: string) {
     if (!level) return;
@@ -132,31 +134,84 @@ export function GameScreen() {
     void platformServices.ads.showInterstitialIfAllowed();
   }
 
-  function handleRevealLetter() {
-    if (!level) return;
-    if (!spendOnHint(REVEAL_LETTER_ITEM)) return;
-    refreshCoins();
-    const candidates: string[] = [];
-    for (const [key, wordIndices] of cellsByWordIndex) {
-      const alreadyFilled = wordIndices.some((i) => foundWords.has(level.grid.words[i]!.w));
-      if (!alreadyFilled && !hintedCells.has(key)) candidates.push(key);
+  /** First unrevealed cell of `word`, in reading order, or null if every cell is already hinted. */
+  function nextCellFor(word: GridWordPlacement): string | null {
+    for (const cell of cellsForWord(word)) {
+      const key = `${cell.x},${cell.y}`;
+      if (!hintedCells.has(key)) return key;
     }
-    if (candidates.length === 0) return;
-    const pick = candidates[Math.floor(Math.random() * candidates.length)]!;
-    setHintedCells(new Set(hintedCells).add(pick));
+    return null;
   }
 
-  function handleRevealWord() {
-    if (!level) return;
+  function pickNewTargetWord(): GridWordPlacement | null {
+    if (!level) return null;
     const unfound = level.grid.words.filter((w) => !foundWords.has(w.w));
-    if (unfound.length === 0) return;
-    if (!spendOnHint(REVEAL_WORD_ITEM)) return;
+    if (unfound.length === 0) return null;
+    return unfound[Math.floor(Math.random() * unfound.length)]!;
+  }
+
+  /**
+   * Reveal-letter hint: works through one word at a time, one letter per
+   * use, in reading order. Once that word is found (or has nothing left to
+   * reveal), the next press picks a new unfound word and reveals its first
+   * letter — same button press, same coin spend.
+   */
+  function handleRevealLetter() {
+    if (!level) return;
+    let target = hintTargetWord ? level.grid.words.find((w) => w.w === hintTargetWord) ?? null : null;
+    if (target && foundWords.has(target.w)) target = null;
+    let key = target ? nextCellFor(target) : null;
+    if (!target || !key) {
+      target = pickNewTargetWord();
+      if (!target) return;
+      key = nextCellFor(target);
+      if (!key) return;
+    }
+    if (!spendOnHint(REVEAL_LETTER_ITEM)) return;
     refreshCoins();
-    const pick = unfound[Math.floor(Math.random() * unfound.length)]!;
-    const next = new Set(foundWords);
-    next.add(pick.w);
-    setFoundWords(next);
-    if (next.size === level.grid.words.length) finishLevel();
+    setHintTargetWord(target.w);
+    const nextHinted = new Set(hintedCells).add(key);
+    setHintedCells(nextHinted);
+    completeFullyHintedWords(nextHinted);
+  }
+
+  function handleTogglePickLetter() {
+    setPickLetterMode((v) => !v);
+  }
+
+  /** Pick-letter hint: player taps the specific empty cell they want revealed. */
+  function handleCellPick(key: string) {
+    setPickLetterMode(false);
+    if (!spendOnHint(PICK_LETTER_ITEM)) return;
+    refreshCoins();
+    const nextHinted = new Set(hintedCells).add(key);
+    setHintedCells(nextHinted);
+    completeFullyHintedWords(nextHinted);
+  }
+
+  /**
+   * A word revealed entirely by hints (every one of its cells hinted) never
+   * goes through handleSubmit, so it would otherwise stay unfound forever
+   * even though the grid shows it complete. Mark it found here instead.
+   */
+  function completeFullyHintedWords(nextHinted: ReadonlySet<string>) {
+    if (!level) return;
+    let next: Set<string> | null = null;
+    for (const w of level.grid.words) {
+      if (foundWords.has(w.w)) continue;
+      if (cellsForWord(w).every((c) => nextHinted.has(`${c.x},${c.y}`))) {
+        if (!next) next = new Set(foundWords);
+        next.add(w.w);
+        playSound("wordFound");
+        hapticWordFound();
+      }
+    }
+    if (next) {
+      setFoundWords(next);
+      if (next.size === level.grid.words.length) {
+        finishLevel();
+      }
+    }
   }
 
   const allFound = level ? foundWords.size === level.grid.words.length : false;
@@ -197,6 +252,7 @@ export function GameScreen() {
             theme={theme}
             availableWidth={gridArea.width}
             availableHeight={gridArea.height}
+            onCellPress={pickLetterMode ? handleCellPick : undefined}
           />
         )}
       </View>
@@ -206,11 +262,12 @@ export function GameScreen() {
       <HintButtons
         theme={theme}
         letterLabel={t("game.hintLetter")}
-        wordLabel={t("game.hintWord")}
+        pickLabel={t("game.hintPickLetter")}
         letterCost={hintPrice(REVEAL_LETTER_ITEM)}
-        wordCost={hintPrice(REVEAL_WORD_ITEM)}
+        pickCost={hintPrice(PICK_LETTER_ITEM)}
         onRevealLetter={handleRevealLetter}
-        onRevealWord={handleRevealWord}
+        onTogglePickLetter={handleTogglePickLetter}
+        pickActive={pickLetterMode}
         disabled={allFound}
       />
 

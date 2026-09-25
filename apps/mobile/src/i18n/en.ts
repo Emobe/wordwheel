@@ -25,7 +25,7 @@ const en = {
   "game.bonusWordsButton": "Bonus words",
   "game.shuffle": "Shuffle",
   "game.hintLetter": "Reveal letter",
-  "game.hintWord": "Reveal word",
+  "game.hintPickLetter": "Pick letter",
   "game.solved": "— solved!",
 
   "bonusWords.title": "Bonus words",
