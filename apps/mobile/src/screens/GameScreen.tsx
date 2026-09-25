@@ -239,7 +239,6 @@ export function GameScreen() {
         coins={coins}
         onBack={back}
         onSettings={() => goTo("settings")}
-        onBonusWords={() => goTo("bonusWords")}
         onShop={() => goTo("shop")}
       />
 
@@ -261,23 +260,22 @@ export function GameScreen() {
         )}
       </View>
 
-      <Text style={[styles.bonusLine, { color: theme.accent }]}>{t("game.bonusWordsFound", { count: foundBonusWords.size })}</Text>
-
-      <HintButtons
-        theme={theme}
-        letterLabel={t("game.hintLetter")}
-        pickLabel={t("game.hintPickLetter")}
-        letterCost={hintPrice(REVEAL_LETTER_ITEM)}
-        pickCost={hintPrice(PICK_LETTER_ITEM)}
-        onRevealLetter={handleRevealLetter}
-        onTogglePickLetter={handleTogglePickLetter}
-        pickActive={pickLetterMode}
-        disabled={allFound}
-      />
-
       <WordPreview word={previewWord} theme={theme} shakeToken={shakeToken} />
 
       <View style={styles.wheelArea}>
+        <View style={styles.hintColumn}>
+          <HintButtons
+            theme={theme}
+            letterCost={hintPrice(REVEAL_LETTER_ITEM)}
+            pickCost={hintPrice(PICK_LETTER_ITEM)}
+            onRevealLetter={handleRevealLetter}
+            onTogglePickLetter={handleTogglePickLetter}
+            pickActive={pickLetterMode}
+            disabled={allFound}
+            bonusWordCount={foundBonusWords.size}
+            onBonusWords={() => goTo("bonusWords")}
+          />
+        </View>
         <Wheel letters={arrangement} theme={theme} onSubmit={handleSubmit} onSelectionChange={setPreviewWord} />
       </View>
 
@@ -304,17 +302,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  bonusLine: {
-    textAlign: "center",
-    fontSize: 12,
-    marginBottom: 4,
-    paddingHorizontal: 8,
-  },
   wheelArea: {
     flex: 2,
     minHeight: 140,
     width: "100%",
     marginTop: 4,
     marginBottom: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  // Overlaid on the wheel's left edge rather than taking up row space, so
+  // the wheel itself stays centered on the screen instead of being centered
+  // within whatever width is left after a layout sibling.
+  hintColumn: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    zIndex: 1,
   },
 });
