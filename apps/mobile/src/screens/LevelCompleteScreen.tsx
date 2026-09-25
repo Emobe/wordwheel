@@ -10,7 +10,7 @@ import { hapticLevelComplete } from "../haptics";
 
 export function LevelCompleteScreen() {
   const theme = useTheme();
-  const { goTo, lastCoinsEarned, startNewLevelRun } = useAppState();
+  const { replace, lastCoinsEarned, startNewLevelRun } = useAppState();
   const t = useTranslation();
   const scale = useSharedValue(0.6);
   const opacity = useSharedValue(0);
@@ -41,7 +41,7 @@ export function LevelCompleteScreen() {
           style={[styles.button, { backgroundColor: theme.tileFilledBg }]}
           onPress={() => {
             startNewLevelRun();
-            goTo("game");
+            replace("game");
           }}
         >
           <Text style={[styles.buttonText, { color: theme.tileFilledText }]}>{t("levelComplete.continue")}</Text>
