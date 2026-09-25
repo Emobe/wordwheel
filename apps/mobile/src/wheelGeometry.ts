@@ -3,9 +3,15 @@ export interface WheelPoint {
   y: number;
 }
 
-/** Centres of each letter circle, arranged evenly around the wheel, starting at the top. */
-export function wheelLayout(count: number, wheelDiameter: number, letterDiameter: number): WheelPoint[] {
-  const radius = (wheelDiameter - letterDiameter) / 2;
+/**
+ * Centres of each letter circle, arranged evenly around the wheel, starting
+ * at the top. `edgeMargin` insets the ring from the wheel's outer edge —
+ * without it, `radius = (wheelDiameter - letterDiameter) / 2` puts each
+ * letter circle exactly tangent to the wheel's edge, leaving no breathing
+ * room and making the wheel look mostly like wasted empty space.
+ */
+export function wheelLayout(count: number, wheelDiameter: number, letterDiameter: number, edgeMargin = 0): WheelPoint[] {
+  const radius = (wheelDiameter - letterDiameter) / 2 - edgeMargin;
   const center = wheelDiameter / 2;
   const points: WheelPoint[] = [];
   for (let i = 0; i < count; i++) {
