@@ -239,7 +239,6 @@ export function GameScreen() {
         coins={coins}
         onBack={back}
         onSettings={() => goTo("settings")}
-        onBonusWords={() => goTo("bonusWords")}
         onShop={() => goTo("shop")}
       />
 
@@ -261,9 +260,9 @@ export function GameScreen() {
         )}
       </View>
 
-      <Text style={[styles.bonusLine, { color: theme.accent }]}>{t("game.bonusWordsFound", { count: foundBonusWords.size })}</Text>
-
       <WordPreview word={previewWord} theme={theme} shakeToken={shakeToken} />
+
+      <Text style={[styles.bonusLine, { color: theme.accent }]}>{t("game.bonusWordsFound", { count: foundBonusWords.size })}</Text>
 
       <View style={styles.wheelArea}>
         <View style={styles.hintColumn}>
@@ -275,6 +274,8 @@ export function GameScreen() {
             onTogglePickLetter={handleTogglePickLetter}
             pickActive={pickLetterMode}
             disabled={allFound}
+            bonusWordCount={foundBonusWords.size}
+            onBonusWords={() => goTo("bonusWords")}
           />
         </View>
         <Wheel letters={arrangement} theme={theme} onSubmit={handleSubmit} onSelectionChange={setPreviewWord} />

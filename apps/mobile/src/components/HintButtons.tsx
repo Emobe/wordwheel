@@ -9,16 +9,18 @@ interface HintButtonsProps {
   onTogglePickLetter: () => void;
   pickActive: boolean;
   disabled: boolean;
+  bonusWordCount: number;
+  onBonusWords: () => void;
 }
 
 /**
- * Icon-only hint buttons (Plan.md section 12: "hint button showing its
- * cost") — a vertical column beside the wheel instead of a labeled row
- * under the grid, so the grid gets the vertical space back. Bulb = reveal
- * letter (sequentially reveals an auto-picked word, one letter per use);
- * crosshair = pick letter (arms tap-to-reveal mode for a specific empty
- * cell). Cost only renders as a badge when non-zero — a free hint needs no
- * label to read as free.
+ * Icon-only buttons in a vertical column beside the wheel, instead of a
+ * labeled row under the grid (hint buttons) or a header icon (bonus words)
+ * — consolidating them here gives the grid back the vertical space. Bulb =
+ * reveal letter (sequentially reveals an auto-picked word, one letter per
+ * use); crosshair = pick letter (arms tap-to-reveal mode for a specific
+ * empty cell); star = open the bonus words found this level. Cost/count
+ * only renders as a badge when non-zero — free/empty needs no label.
  */
 export function HintButtons({
   theme,
@@ -28,6 +30,8 @@ export function HintButtons({
   onTogglePickLetter,
   pickActive,
   disabled,
+  bonusWordCount,
+  onBonusWords,
 }: HintButtonsProps) {
   return (
     <View style={styles.column}>
@@ -59,6 +63,17 @@ export function HintButtons({
         {pickCost > 0 && (
           <View style={[styles.badge, { backgroundColor: theme.accent }]}>
             <Text style={[styles.badgeText, { color: theme.tileFilledText }]}>{pickCost}</Text>
+          </View>
+        )}
+      </Pressable>
+      <Pressable
+        onPress={onBonusWords}
+        style={[styles.button, { backgroundColor: theme.surface, borderColor: theme.tileEmptyBorder }]}
+      >
+        <Text style={styles.icon}>★</Text>
+        {bonusWordCount > 0 && (
+          <View style={[styles.badge, { backgroundColor: theme.accent }]}>
+            <Text style={[styles.badgeText, { color: theme.tileFilledText }]}>{bonusWordCount}</Text>
           </View>
         )}
       </Pressable>
