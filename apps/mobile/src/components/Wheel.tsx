@@ -3,6 +3,7 @@ import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Canvas, Path, Skia } from "@shopify/react-native-skia";
 import { wheelLayout } from "../wheelGeometry";
+import { hapticTap } from "../haptics";
 import type { Theme } from "../theme";
 
 const LETTER_DIAMETER = 44;
@@ -74,6 +75,7 @@ export function Wheel({ letters, theme, onSubmit, onSelectionChange }: WheelProp
         }
         if (prev.includes(idx)) return prev;
         const next = [...prev, idx];
+        hapticTap();
         onSelectionChange(next.map((i) => letters[i]).join(""));
         return next;
       });
