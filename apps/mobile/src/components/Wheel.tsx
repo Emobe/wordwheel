@@ -6,14 +6,19 @@ import { wheelLayout } from "../wheelGeometry";
 import { hapticTap } from "../haptics";
 import type { Theme } from "../theme";
 
-const LETTER_DIAMETER = 44;
+const LETTER_DIAMETER = 56;
 const HIT_SLOP = 16;
+// Inset the letter ring from the wheel's outer edge — previously the ring
+// radius put each letter circle exactly tangent to the wheel edge, leaving
+// no breathing room and making the (large) wheel read as mostly empty space
+// around a cramped ring.
+const EDGE_MARGIN = 16;
 // Not a Plan.md requirement (unlike the grid's 28dp tile floor) — just a
 // reasonable lower bound, so it's the first thing to give when a small
 // screen (360x640dp) can't fit both a floor-sized grid and a comfortable
-// wheel. 168 keeps 7 letters at LETTER_DIAMETER apart without touching.
-const MIN_WHEEL_DIAMETER = 168;
-const MAX_WHEEL_DIAMETER = 320;
+// wheel. 220 keeps 7 letters at LETTER_DIAMETER + EDGE_MARGIN apart without touching.
+const MIN_WHEEL_DIAMETER = 220;
+const MAX_WHEEL_DIAMETER = 280;
 
 interface WheelProps {
   letters: string[];
@@ -49,7 +54,7 @@ export function Wheel({ letters, theme, onSubmit, onSelectionChange }: WheelProp
   // wheelLayout returns the CENTRE of each letter circle, relative to this
   // container's top-left corner.
   const points = useMemo(
-    () => (wheelSize > 0 ? wheelLayout(letters.length, wheelSize, LETTER_DIAMETER) : []),
+    () => (wheelSize > 0 ? wheelLayout(letters.length, wheelSize, LETTER_DIAMETER, EDGE_MARGIN) : []),
     [letters.length, wheelSize],
   );
 
@@ -164,7 +169,7 @@ export function Wheel({ letters, theme, onSubmit, onSelectionChange }: WheelProp
                   >
                     <Text
                       style={{
-                        fontSize: 22,
+                        fontSize: 26,
                         fontWeight: "700",
                         color: isSelected ? theme.wheelLetterTextSelected : theme.wheelLetterText,
                       }}
@@ -190,8 +195,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   wheel: {
-    maxWidth: 320,
-    maxHeight: 320,
+    maxWidth: MAX_WHEEL_DIAMETER,
+    maxHeight: MAX_WHEEL_DIAMETER,
   },
   letter: {
     position: "absolute",
