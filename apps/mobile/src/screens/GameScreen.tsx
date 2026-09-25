@@ -262,8 +262,6 @@ export function GameScreen() {
 
       <WordPreview word={previewWord} theme={theme} shakeToken={shakeToken} />
 
-      <Text style={[styles.bonusLine, { color: theme.accent }]}>{t("game.bonusWordsFound", { count: foundBonusWords.size })}</Text>
-
       <View style={styles.wheelArea}>
         <View style={styles.hintColumn}>
           <HintButtons
@@ -303,12 +301,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
-  },
-  bonusLine: {
-    textAlign: "center",
-    fontSize: 12,
-    marginBottom: 4,
-    paddingHorizontal: 8,
   },
   wheelArea: {
     flex: 2,
