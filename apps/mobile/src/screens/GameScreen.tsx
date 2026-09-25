@@ -34,6 +34,7 @@ export function GameScreen() {
   const t = useTranslation();
   const {
     goTo,
+    replace,
     back,
     settings,
     coins,
@@ -128,7 +129,10 @@ export function GameScreen() {
     refreshCoins();
     setLastCoinsEarned(10); // DEFAULT_ECONOMY_CONFIG.earningRules.levelComplete, see wallet.ts
     completeLevel(settings.wordLanguage, currentLevel);
-    goTo("levelComplete");
+    // replace, not goTo: levelComplete is an interstitial, not a screen the
+    // player should ever land back on via the back button (see
+    // MANUAL_PLAYTEST_NOTES.md).
+    replace("levelComplete");
     // Plan.md section 16: "capped interstitials." Fire-and-forget so a slow
     // or unavailable ad never blocks the level-complete navigation above.
     void platformServices.ads.showInterstitialIfAllowed();

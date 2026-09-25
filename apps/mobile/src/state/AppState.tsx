@@ -17,6 +17,10 @@ export type ScreenName =
 interface AppStateValue {
   screen: ScreenName;
   goTo: (screen: ScreenName) => void;
+  /** Switches screen without pushing the current one onto the back-history — for
+   * transitions the player shouldn't be able to land back on, like the level-complete
+   * interstitial (see finishLevel/LevelCompleteScreen's continue button). */
+  replace: (screen: ScreenName) => void;
   back: () => void;
   settings: Settings;
   refreshSettings: () => void;
@@ -72,6 +76,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [screen],
   );
 
+  const replace = useCallback((next: ScreenName) => {
+    setScreen(next);
+  }, []);
+
   const back = useCallback(() => {
     setHistory((h) => {
       if (h.length === 0) {
@@ -103,6 +111,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const value: AppStateValue = {
     screen,
     goTo,
+    replace,
     back,
     settings,
     refreshSettings,
