@@ -6,8 +6,14 @@ export const DEFAULT_CONFIG: GeneratorConfig = {
     { band: 1, minLevel: 1, maxLevel: 100, wheelMin: 3, wheelMax: 4, gridWordsMin: 3, gridWordsMax: 6, maxRarestRank: 20 },
     { band: 2, minLevel: 101, maxLevel: 400, wheelMin: 4, wheelMax: 5, gridWordsMin: 6, gridWordsMax: 10, maxRarestRank: 40 },
     { band: 3, minLevel: 401, maxLevel: 1200, wheelMin: 5, wheelMax: 6, gridWordsMin: 8, gridWordsMax: 14, maxRarestRank: 60 },
-    { band: 4, minLevel: 1200, maxLevel: 3000, wheelMin: 6, wheelMax: 7, gridWordsMin: 6, gridWordsMax: 9, maxRarestRank: 80 },
-    { band: 5, minLevel: 3000, maxLevel: 999999, wheelMin: 7, wheelMax: 7, gridWordsMin: 7, gridWordsMax: 10, maxRarestRank: 80 },
+    // gridWordsMin/Max restored per real measurement against the 11x6
+    // ceiling below (see sweep numbers in that comment): band 4 fits its
+    // original 10-16 range at 100% success; band 5's original 12-18 is still
+    // infeasible even at 11x6 (measured near-total retry failure and
+    // multi-second stalls), so it's set to 10-15 — the highest range that
+    // measured 100% success at an acceptable per-level generation cost.
+    { band: 4, minLevel: 1200, maxLevel: 3000, wheelMin: 6, wheelMax: 7, gridWordsMin: 10, gridWordsMax: 16, maxRarestRank: 80 },
+    { band: 5, minLevel: 3000, maxLevel: 999999, wheelMin: 7, wheelMax: 7, gridWordsMin: 10, gridWordsMax: 15, maxRarestRank: 80 },
   ],
   // Re-measured live on a real 360x640dp device (adb `wm size`/`wm density`
   // override to get the exact target resolution) against the *current* UI
