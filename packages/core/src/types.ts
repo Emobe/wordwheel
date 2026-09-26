@@ -79,4 +79,14 @@ export interface GeneratorConfig {
   /** cols <= shapeColsFactor * rows */
   shapeColsFactor: number;
   maxAttemptsPerLevel: number;
+  /**
+   * Total layout-backtracking node budget shared across every attempt inside
+   * one `generateLevel` call (see `layout.ts`'s `LayoutOptions.nodeBudget`).
+   * Bounds a single level generation's worst case at this many nodes total,
+   * regardless of `maxAttemptsPerLevel` or how infeasible the band's
+   * word-count range is for the grid ceiling, so a bad combination fails
+   * fast instead of spending up to `maxAttemptsPerLevel` * (per-attempt
+   * 20000-node cap) trying anyway.
+   */
+  maxTotalLayoutNodes: number;
 }

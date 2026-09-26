@@ -38,4 +38,12 @@ export const DEFAULT_CONFIG: GeneratorConfig = {
   shapeRowsFactor: 1.2,
   shapeColsFactor: 1.6,
   maxAttemptsPerLevel: 200,
+  // Caps a single generateLevel call's total backtracking work regardless of
+  // maxAttemptsPerLevel. Sized from real measurement (see layout.ts's
+  // nodeBudget doc comment): every observed real success needed well under
+  // 2000 nodes, so 50000 total leaves generous headroom for legitimately
+  // hard-but-feasible layouts while still failing a truly infeasible
+  // word-count/grid-size combination in well under a second instead of
+  // ~2s/attempt * up to 200 attempts.
+  maxTotalLayoutNodes: 50000,
 };
