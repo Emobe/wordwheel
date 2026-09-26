@@ -3,7 +3,10 @@ import type { GeneratorConfig } from "./types.js";
 /** Starting values from sections 8 and 10 of the plan. Tunable without regenerating. */
 export const DEFAULT_CONFIG: GeneratorConfig = {
   bands: [
-    { band: 1, minLevel: 1, maxLevel: 100, wheelMin: 3, wheelMax: 4, gridWordsMin: 3, gridWordsMax: 6, maxRarestRank: 20 },
+    // wheelMin raised 3->4 to match Plan.md's difficulty table (band 1's
+    // wheel column is now a single "4", not a "3-4" range) — no band has a
+    // 3-letter wheel minimum any more.
+    { band: 1, minLevel: 1, maxLevel: 100, wheelMin: 4, wheelMax: 4, gridWordsMin: 3, gridWordsMax: 6, maxRarestRank: 20 },
     { band: 2, minLevel: 101, maxLevel: 400, wheelMin: 4, wheelMax: 5, gridWordsMin: 6, gridWordsMax: 10, maxRarestRank: 40 },
     { band: 3, minLevel: 401, maxLevel: 1200, wheelMin: 5, wheelMax: 6, gridWordsMin: 8, gridWordsMax: 14, maxRarestRank: 60 },
     // gridWordsMin/Max restored per real measurement against the 11x6

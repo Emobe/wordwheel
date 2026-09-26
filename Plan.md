@@ -186,7 +186,7 @@ Starting bands, all tunable:
 
 | Band | Levels | Wheel | Grid words | Rarest required word |
 |---|---|---|---|---|
-| 1 | 1-100 | 3-4 | 3-6 | most common |
+| 1 | 1-100 | 4 | 3-6 | most common |
 | 2 | 101-400 | 4-5 | 6-10 | common |
 | 3 | 401-1200 | 5-6 | 8-14 | mid |
 | 4 | 1200-3000 | 6-7 | 10-16 | uncommon |
