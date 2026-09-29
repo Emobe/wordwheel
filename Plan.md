@@ -337,10 +337,10 @@ Each phase ends with a gate that must pass before the next starts.
 ## 21. Known gaps between plan and code
 
 - **Layout scoring.** Section 7 step 4 says layouts are scored, but `layoutGrid` returns the first valid layout. About 47% of band 4 and 37% of band 5 levels in a 1,000-level run had no redundant crossings (no loops). That is a shape measure, not a defect by itself. Define a bad layout first (for example a crossings floor for the word count, or a fill density threshold), then fix. Parked.
-- **Pool size.** Bundled pools hold 100 levels per band, a placeholder (`mobile-fixtures.ts`). The 500 bundled levels total 395 KB, so about 2,000 band 5 levels would be about 2 MB uncompressed. With the proposed boundaries, band 4 is exactly 100 levels wide, so most players reach the pool's replay point (section 9) right around when they finish the band. Whether `packages/core` implements the replay-ranking in step 2 of section 9 is unchecked.
+- **Pool size.** Bundled pools hold 100 levels per band, a placeholder (`mobile-fixtures.ts`). The 500 bundled levels total 395 KB, so about 2,000 band 5 levels would be about 2 MB uncompressed. With the proposed boundaries, band 4 is exactly 100 levels wide, so most players reach the pool's replay point (section 9) right around when they finish the band. `packages/core` implements the replay ranking in step 2 of section 9.
 - **Tutorial.** Static walkthrough, not guided levels.
 - **Grid budget.** Needs a re-measure after the Phase 2 UI changes.
-- **Band boundaries.** Confirmed values in section 10 are not yet applied to config.
+- **Band boundaries.** Confirmed values in section 10 are applied in `DEFAULT_CONFIG.bands` (the single source).
 - **Grid config.** A reported change to 11 columns is not visible in generated levels. The effective ceiling is 9x6.
 - **Difficulty score.** Attached after generation and used for ranking within a band, not for band assignment.
 - **React warning** in GameScreen and Wheel (state set during render from onSelectionChange). Pre-existing.

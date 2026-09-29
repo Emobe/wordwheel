@@ -9,7 +9,7 @@ import {
   type Level,
 } from "@word-wheel/core";
 import { bonusWordsFor, poolLevels } from "../data/pools";
-import { getPlayedLevelIds, getProgress, getSeenHistory, recordPlayedLevel, recordSeenWords, setLevel } from "../db/repository";
+import { getLastPlayedAt, getProgress, getSeenHistory, recordPlayedLevel, recordSeenWords, setLevel } from "../db/repository";
 
 export interface CurrentLevel {
   level: Level;
@@ -30,11 +30,11 @@ export function pickCurrentLevel(lang: string): CurrentLevel | null {
   const band = bandForLevel(DEFAULT_CONFIG.bands, progress.level);
   const target = targetDifficultyForLevel(DEFAULT_CONFIG.bands, DEFAULT_DIFFICULTY_CURVE, progress.level);
   const pool = poolLevels(band.band);
-  const played = getPlayedLevelIds(lang);
+  const lastPlayedAt = getLastPlayedAt(lang);
   const seen = getSeenHistory(lang);
   const rng = makeRng(Math.floor(Math.random() * 2 ** 31));
 
-  const level = selectNextLevel(pool, target, played, seen, rng);
+  const level = selectNextLevel(pool, target, lastPlayedAt, seen, rng);
   if (!level) return null;
   return {
     level,
