@@ -2,8 +2,9 @@
  * Plan.md section 14: SQLite save. One database, one player. Tables:
  *  - player: single row, anonymous ID + creation time.
  *  - progress: per-language current level number (one row per word language).
- *  - played_levels: which level IDs a language's player has completed, so
- *    level-selection.ts can exclude them.
+ *  - played_levels: level IDs a language's player has completed and when
+ *    each was last completed, so level-selection.ts can rank unplayed first,
+ *    then oldest-played.
  *  - seen_words / seen_wheels: last-seen timestamps for level-selection.ts's
  *    variety ranking.
  *  - settings: single row — UI language, current word language, sound,
