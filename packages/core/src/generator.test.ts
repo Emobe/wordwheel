@@ -123,6 +123,43 @@ describe("generateLevel", () => {
   });
 });
 
+describe("generateLevel stats", () => {
+  test("reports attempts within the limit on success, and does not change the level", () => {
+    const pack = makePack();
+    const trie = buildTrie(pack.accepted);
+    const config = makeConfig();
+    const band = config.bands[0]!;
+
+    const stats = { attempts: -1, succeeded: false };
+    const withStats = generateLevel({ pack, trie, config, band, rng: makeRng(42), id: "s", stats });
+    const without = generateLevel({ pack, trie, config, band, rng: makeRng(42), id: "s" });
+
+    expect(withStats).not.toBeNull();
+    expect(stats.succeeded).toBe(true);
+    expect(stats.attempts).toBeGreaterThanOrEqual(1);
+    expect(stats.attempts).toBeLessThanOrEqual(config.maxAttemptsPerLevel);
+    // Instrumentation must not alter output or RNG consumption.
+    expect(withStats).toEqual(without);
+  });
+
+  test("reports the exhausted attempt count when generation fails", () => {
+    const pack = makePack();
+    const trie = buildTrie(pack.accepted);
+    // Impossible word-count minimum: every attempt is rejected.
+    const config: GeneratorConfig = {
+      ...makeConfig(),
+      bands: makeConfig().bands.map((b) => ({ ...b, gridWordsMin: 999, gridWordsMax: 999 })),
+      maxAttemptsPerLevel: 7,
+    };
+    const stats = { attempts: -1, succeeded: true };
+    const level = generateLevel({ pack, trie, config, band: config.bands[0]!, rng: makeRng(1), id: "f", stats });
+
+    expect(level).toBeNull();
+    expect(stats.succeeded).toBe(false);
+    expect(stats.attempts).toBe(7);
+  });
+});
+
 describe("bonusWords", () => {
   test("returns spellable words minus the required grid words, uppercased", () => {
     const pack = makePack();
