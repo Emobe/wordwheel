@@ -7,7 +7,6 @@ interface GameHeaderProps {
   coins: number;
   onBack: () => void;
   onSettings: () => void;
-  onBonusWords: () => void;
   onShop: () => void;
 }
 
@@ -20,7 +19,7 @@ interface GameHeaderProps {
  * long chapter name truncates with an ellipsis instead of overlapping
  * either side button, at any screen width down to the 360dp target.
  */
-export function GameHeader({ theme, title, coins, onBack, onSettings, onBonusWords, onShop }: GameHeaderProps) {
+export function GameHeader({ theme, title, coins, onBack, onSettings, onShop }: GameHeaderProps) {
   return (
     <View style={styles.row}>
       <Pressable onPress={onBack} hitSlop={8} style={styles.sideButton}>
@@ -36,9 +35,6 @@ export function GameHeader({ theme, title, coins, onBack, onSettings, onBonusWor
       </Text>
 
       <View style={styles.rightGroup}>
-        <Pressable onPress={onBonusWords} hitSlop={6} style={styles.iconButton}>
-          <Text style={[styles.iconText, { color: theme.textMuted }]}>★</Text>
-        </Pressable>
         <Pressable onPress={onShop} hitSlop={6} style={[styles.coinPill, { backgroundColor: theme.surface, borderColor: theme.tileEmptyBorder }]}>
           <Text style={[styles.coinText, { color: theme.accent }]}>{coins}</Text>
         </Pressable>

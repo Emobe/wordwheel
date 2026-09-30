@@ -37,12 +37,13 @@ export function recordPlayedLevel(lang: string, levelId: string) {
   );
 }
 
-export function getPlayedLevelIds(lang: string): Set<string> {
-  const rows = getDatabase().getAllSync<{ level_id: string }>(
-    "SELECT level_id FROM played_levels WHERE lang = ?",
+/** level id -> when it was last completed (ms). recordPlayedLevel overwrites the timestamp on replay. */
+export function getLastPlayedAt(lang: string): Map<string, number> {
+  const rows = getDatabase().getAllSync<{ level_id: string; played_at: number }>(
+    "SELECT level_id, played_at FROM played_levels WHERE lang = ?",
     [lang],
   );
-  return new Set(rows.map((r) => r.level_id));
+  return new Map(rows.map((r) => [r.level_id, r.played_at]));
 }
 
 export function recordSeenWords(lang: string, baseWords: readonly string[], wheelKey: string) {

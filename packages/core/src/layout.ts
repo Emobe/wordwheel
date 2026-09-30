@@ -22,6 +22,19 @@ interface LayoutOptions {
   maxRows: number;
   shapeRowsFactor: number;
   shapeColsFactor: number;
+  /**
+   * Shared across every retry attempt within one `generateLevel` call (not
+   * just this one `layoutGrid` invocation): each node checked decrements it,
+   * and once it hits zero every subsequent attempt in the same level-generation
+   * call fails immediately instead of spending its own fresh MAX_NODES budget.
+   * Without this, a band whose word-count floor doesn't reliably fit the grid
+   * ceiling burns up to attemptsPerLevel * MAX_NODES backtracking nodes on a
+   * single failing level (measured: ~2s/attempt, 15% success at band 5's
+   * original 12/18 word-count range against the 9x6 ceiling) instead of
+   * failing cheaply. Optional so existing single-shot callers/tests are
+   * unaffected.
+   */
+  nodeBudget?: { remaining: number };
 }
 
 function cellsOf(p: PlacedWord): Cell[] {
@@ -154,10 +167,12 @@ export function layoutGrid(words: readonly string[], opts: LayoutOptions): Layou
   let best: { placed: PlacedWord[] } | null = null;
   const MAX_NODES = 20000;
   let nodes = 0;
+  const budget = opts.nodeBudget;
 
   function tryPlace(placed: PlacedWord[], remaining: string[]): boolean {
     nodes++;
-    if (nodes > MAX_NODES) return false;
+    if (budget) budget.remaining--;
+    if (nodes > MAX_NODES || (budget && budget.remaining <= 0)) return false;
     if (remaining.length === 0) {
       best = { placed: placed.map((p) => ({ ...p })) };
       return true;
@@ -195,7 +210,7 @@ export function layoutGrid(words: readonly string[], opts: LayoutOptions): Layou
       if (!fitsSize(b.minX, b.maxX, b.minY, b.maxY, opts)) continue;
 
       if (tryPlace(trial, rest)) return true;
-      if (nodes > MAX_NODES) return false;
+      if (nodes > MAX_NODES || (budget && budget.remaining <= 0)) return false;
     }
     return false;
   }

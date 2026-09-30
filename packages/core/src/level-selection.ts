@@ -15,26 +15,28 @@ function wheelKey(level: Level): string {
 }
 
 /**
- * Plan.md section 9: rank candidates by closeness to the target difficulty
- * and by how long since the player last saw their grid words/wheel, then
- * pick from the top few with a little randomness so two players don't get
- * identical runs. Excludes already-played levels; if that empties the pool
- * (a player has exhausted a band), falls back to allowing replays rather
- * than refusing to return a level.
+ * Plan.md section 9: rank candidates with unplayed levels first, then by how
+ * long since each was last played (oldest first). There is no separate
+ * "pool exhausted" state: once every level has been played, the same ranking
+ * simply surfaces replays. Within the same rank, order by closeness to the
+ * target difficulty and by how long since the player last saw the grid words
+ * and wheel. Then pick from the top few with a little randomness so two
+ * players don't get identical runs and replays don't repeat in a fixed order.
+ *
+ * `lastPlayedAt` maps level id -> timestamp (ms) it was last completed;
+ * absent = never played. Unplayed levels always outrank played ones, so the
+ * top-few window never mixes a replay in while an unplayed level remains.
  */
 export function selectNextLevel(
   pool: readonly Level[],
   targetDifficulty: number,
-  playedLevelIds: ReadonlySet<string>,
+  lastPlayedAt: ReadonlyMap<string, number>,
   seen: SeenHistory,
   rng: Rng,
   now: number = Date.now(),
 ): Level | null {
   if (pool.length === 0) return null;
-  const unplayed = pool.filter((l) => !playedLevelIds.has(l.id));
-  const candidates = unplayed.length > 0 ? unplayed : pool;
-
-  const scored = candidates.map((level) => {
+  const scored = pool.map((level) => {
     const difficultyGap = Math.abs(level.difficulty - targetDifficulty);
     const wheelAge = now - (seen.wheelLastSeen.get(wheelKey(level)) ?? 0);
     const baseWordAges = level.grid.words.map(
@@ -48,10 +50,14 @@ export function selectNextLevel(
     // capping recency's contribution rather than letting raw ms dominate.
     const recencyScore = Math.min(1, (wheelAge + avgBaseWordAge) / (2 * 30 * 24 * 60 * 60 * 1000)); // saturates at ~30 days
     const rankScore = difficultyGap - recencyScore * 20;
-    return { level, rankScore };
+    const playedAt = lastPlayedAt.get(level.id) ?? -Infinity;
+    return { level, rankScore, playedAt };
   });
 
-  scored.sort((a, b) => a.rankScore - b.rankScore);
-  const top = scored.slice(0, Math.min(TOP_K, scored.length)).map((s) => s.level);
+  // Primary: unplayed (-Infinity) first, then oldest-played. Secondary: difficulty/variety score.
+  scored.sort((a, b) => (a.playedAt === b.playedAt ? 0 : a.playedAt < b.playedAt ? -1 : 1) || a.rankScore - b.rankScore);
+  const window = scored.slice(0, Math.min(TOP_K, scored.length));
+  const unplayedFirst = window[0]!.playedAt === -Infinity;
+  const top = (unplayedFirst ? window.filter((s) => s.playedAt === -Infinity) : window).map((s) => s.level);
   return pick(rng, top);
 }

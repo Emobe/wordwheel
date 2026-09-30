@@ -30,8 +30,10 @@ export function generateLevel({ pack, trie, config, band, rng, id }: GenerateLev
   if (wheelWordCandidates.length === 0) return null;
 
   const sizeLimits = config.gridSizeLimits;
+  const nodeBudget = { remaining: config.maxTotalLayoutNodes };
 
   for (let attempt = 0; attempt < config.maxAttemptsPerLevel; attempt++) {
+    if (nodeBudget.remaining <= 0) break;
     const wheelEntry = pick(rng, wheelWordCandidates);
     const wheelWord = wheelEntry.word;
     const wheel = wheelWord.split(""); // lowercase, matches pack casing; uppercased only in the final Level
@@ -69,6 +71,7 @@ export function generateLevel({ pack, trie, config, band, rng, id }: GenerateLev
       maxRows: sizeLimit.maxRows,
       shapeRowsFactor: config.shapeRowsFactor,
       shapeColsFactor: config.shapeColsFactor,
+      nodeBudget,
     });
     if (!layoutResult) continue;
 

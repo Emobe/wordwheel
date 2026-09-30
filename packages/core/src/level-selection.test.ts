@@ -40,36 +40,59 @@ describe("selectNextLevel", () => {
     ];
     const picks = Array.from(
       { length: 12 },
-      (_, i) => selectNextLevel(withDecoys, 100, new Set(), noHistory, makeRng(i))?.id,
+      (_, i) => selectNextLevel(withDecoys, 100, new Map(), noHistory, makeRng(i))?.id,
     );
     expect(picks).not.toContain("e");
     expect(picks).not.toContain("f");
   });
 
-  test("excludes already-played levels", () => {
-    const rng = makeRng(1);
-    const played = new Set(["b", "c", "d"]);
-    const picked = selectNextLevel(pool, 100, played, noHistory, rng);
-    expect(picked?.id).toBe("a");
+  test("ranks unplayed levels ahead of played ones", () => {
+    const played = new Map([["b", 1000], ["c", 2000], ["d", 3000]]);
+    for (let i = 0; i < 12; i++) {
+      expect(selectNextLevel(pool, 100, played, noHistory, makeRng(i))?.id).toBe("a");
+    }
   });
 
-  test("falls back to replays when the whole pool has been played", () => {
-    const rng = makeRng(1);
-    const played = new Set(pool.map((l) => l.id));
-    const picked = selectNextLevel(pool, 100, played, noHistory, rng);
-    expect(picked).not.toBeNull();
+  test("never mixes a replay into the top-few window while an unplayed level remains", () => {
+    const played = new Map([["a", 1], ["b", 2], ["c", 3]]);
+    for (let i = 0; i < 12; i++) {
+      expect(selectNextLevel(pool, 100, played, noHistory, makeRng(i))?.id).toBe("d");
+    }
+  });
+
+  test("once everything is played, surfaces the oldest-played levels", () => {
+    const many: Level[] = Array.from({ length: 10 }, (_, i) => makeLevel(`m${i}`, 100, ["AAA"], ["A"]));
+    // m0 is oldest ... m9 is newest.
+    const played = new Map(many.map((l, i) => [l.id, 1000 + i]));
+    const picks = new Set(
+      Array.from({ length: 60 }, (_, i) => selectNextLevel(many, 100, played, noHistory, makeRng(i))?.id),
+    );
+    for (const id of picks) expect(["m0", "m1", "m2", "m3", "m4"]).toContain(id);
+    expect(picks.size).toBeGreaterThan(1); // randomness applies to replays too
+  });
+
+  test("difficulty closeness breaks ties between equally-recently-played levels", () => {
+    const tied: Level[] = Array.from({ length: 8 }, (_, i) => makeLevel(`t${i}`, 100 + i * 20, ["AAA"], ["A"]));
+    const played = new Map(tied.map((l) => [l.id, 5000]));
+    const picks = Array.from({ length: 30 }, (_, i) => selectNextLevel(tied, 100, played, noHistory, makeRng(i))?.id);
+    expect(picks).not.toContain("t7");
+  });
+
+  test("replays are always available, with no separate exhausted state", () => {
+    const played = new Map(pool.map((l, i) => [l.id, i + 1]));
+    expect(selectNextLevel(pool, 100, played, noHistory, makeRng(1))).not.toBeNull();
   });
 
   test("returns null for an empty pool", () => {
     const rng = makeRng(1);
-    expect(selectNextLevel([], 100, new Set(), noHistory, rng)).toBeNull();
+    expect(selectNextLevel([], 100, new Map(), noHistory, rng)).toBeNull();
   });
 
   test("same seed picks the same level from an otherwise-tied pool", () => {
     const rngA = makeRng(99);
     const rngB = makeRng(99);
-    const a = selectNextLevel(pool, 100, new Set(), noHistory, rngA);
-    const b = selectNextLevel(pool, 100, new Set(), noHistory, rngB);
+    const a = selectNextLevel(pool, 100, new Map(), noHistory, rngA);
+    const b = selectNextLevel(pool, 100, new Map(), noHistory, rngB);
     expect(a?.id).toBe(b?.id);
   });
 
@@ -92,14 +115,14 @@ describe("selectNextLevel", () => {
 
     const picksUnseen = Array.from(
       { length: 12 },
-      (_, i) => selectNextLevel(wide, 100, new Set(), noHistory, makeRng(i), now)?.id,
+      (_, i) => selectNextLevel(wide, 100, new Map(), noHistory, makeRng(i), now)?.id,
     );
     expect(picksUnseen).not.toContain("L6");
 
     const l5Seen = { baseWordLastSeen: new Map([["eee", now]]), wheelLastSeen: new Map([["E", now]]) };
     const picksL5Seen = Array.from(
       { length: 12 },
-      (_, i) => selectNextLevel(wide, 100, new Set(), l5Seen, makeRng(i), now)?.id,
+      (_, i) => selectNextLevel(wide, 100, new Map(), l5Seen, makeRng(i), now)?.id,
     );
     expect(picksL5Seen).not.toContain("L5");
     expect(picksL5Seen).toContain("L6");
