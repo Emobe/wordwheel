@@ -8,7 +8,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_CONFIG } from "../../core/src/config.js";
-import { generateLevel } from "../../core/src/generator.js";
+import { generateLevel, type GenerateLevelStats } from "../../core/src/generator.js";
 import { makeRng, seedFromString } from "../../core/src/prng.js";
 import type { Level } from "../../core/src/types.js";
 import { loadPack } from "./pack-loader.js";
@@ -45,16 +45,24 @@ export async function generatePool(args: Args) {
   const rng = makeRng(seedFromString(args.seed));
   const levels: Level[] = [];
   const attemptTimes: number[] = [];
+  const successAttempts: number[] = [];
+  const failedAttempts: number[] = [];
   let failures = 0;
 
   const genStart = performance.now();
   for (let i = 0; i < args.count; i++) {
     const t0 = performance.now();
     const id = `en-b${args.band}-${String(i).padStart(6, "0")}`;
-    const level = generateLevel({ pack, trie, config: DEFAULT_CONFIG, band, rng, id });
+    const stats: GenerateLevelStats = { attempts: 0, succeeded: false };
+    const level = generateLevel({ pack, trie, config: DEFAULT_CONFIG, band, rng, id, stats });
     attemptTimes.push(performance.now() - t0);
-    if (level) levels.push(level);
-    else failures++;
+    if (level) {
+      levels.push(level);
+      successAttempts.push(stats.attempts);
+    } else {
+      failures++;
+      failedAttempts.push(stats.attempts);
+    }
   }
   const totalMs = performance.now() - genStart;
 
@@ -65,6 +73,16 @@ export async function generatePool(args: Args) {
   console.log(`Band ${args.band}: requested ${args.count}, generated ${levels.length}, failed ${failures}`);
   console.log(`Success rate: ${successRate.toFixed(1)}%`);
   console.log(`Time per level: avg ${avgMs.toFixed(2)} ms, total ${totalMs.toFixed(0)} ms`);
+  if (successAttempts.length > 0) {
+    const avgAttempts = successAttempts.reduce((a, b) => a + b, 0) / successAttempts.length;
+    const maxAttempts = successAttempts.reduce((a, b) => Math.max(a, b), 0);
+    console.log(
+      `Attempts per successful level: avg ${avgAttempts.toFixed(2)}, max ${maxAttempts} (limit ${DEFAULT_CONFIG.maxAttemptsPerLevel})`,
+    );
+  }
+  if (failedAttempts.length > 0) {
+    console.log(`Failed levels used attempts: ${failedAttempts.join(", ")}`);
+  }
 
   const repoRoot = path.resolve(import.meta.dir, "../../..");
   const outPath = args.out ?? path.join(repoRoot, "data", "build", "pools", "en", `band${args.band}.json`);
