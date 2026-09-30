@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, View, type LayoutChangeEvent } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import type { GridWordPlacement } from "@word-wheel/core";
+import { DEFAULT_ECONOMY_CONFIG, type GridWordPlacement } from "@word-wheel/core";
 import { useTheme } from "../useTheme";
 import { useAppState } from "../state/AppState";
 import { useTranslation } from "../i18n/i18n";
@@ -127,7 +127,7 @@ export function GameScreen() {
     if (!level || !currentLevel) return;
     awardLevelComplete();
     refreshCoins();
-    setLastCoinsEarned(10); // DEFAULT_ECONOMY_CONFIG.earningRules.levelComplete, see wallet.ts
+    setLastCoinsEarned(DEFAULT_ECONOMY_CONFIG.earningRules.levelComplete);
     completeLevel(settings.wordLanguage, currentLevel);
     // replace, not goTo: levelComplete is an interstitial, not a screen the
     // player should ever land back on via the back button (see
