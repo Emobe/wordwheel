@@ -7,6 +7,17 @@ import { pick, randomInt, shuffle } from "./prng.js";
 import type { Trie } from "./trie.js";
 import type { DifficultyBand, GeneratorConfig, Level, WordPack } from "./types.js";
 
+/**
+ * Generation-time diagnostics filled in by `generateLevel` when the caller
+ * passes one via `GenerateLevelParams.stats`. Never part of `Level` output.
+ */
+export interface GenerateLevelStats {
+  /** Retry-loop iterations run: 1 = first attempt succeeded. 0 if the band had no wheel-word candidates. */
+  attempts: number;
+  /** False when generateLevel returned null (attempts or layout node budget exhausted). */
+  succeeded: boolean;
+}
+
 export interface GenerateLevelParams {
   pack: WordPack;
   trie: Trie;
@@ -14,9 +25,15 @@ export interface GenerateLevelParams {
   band: DifficultyBand;
   rng: Rng;
   id: string;
+  /** Optional out-parameter; when given, filled with attempt-count diagnostics. */
+  stats?: GenerateLevelStats;
 }
 
-export function generateLevel({ pack, trie, config, band, rng, id }: GenerateLevelParams): Level | null {
+export function generateLevel({ pack, trie, config, band, rng, id, stats }: GenerateLevelParams): Level | null {
+  if (stats) {
+    stats.attempts = 0;
+    stats.succeeded = false;
+  }
   const rankMap = buildRankMap(pack.gridWords);
   const gridWordSet = new Set(pack.gridWords.map((g) => g.word));
 
@@ -34,6 +51,7 @@ export function generateLevel({ pack, trie, config, band, rng, id }: GenerateLev
 
   for (let attempt = 0; attempt < config.maxAttemptsPerLevel; attempt++) {
     if (nodeBudget.remaining <= 0) break;
+    if (stats) stats.attempts = attempt + 1;
     const wheelEntry = pick(rng, wheelWordCandidates);
     const wheelWord = wheelEntry.word;
     const wheel = wheelWord.split(""); // lowercase, matches pack casing; uppercased only in the final Level
@@ -92,6 +110,7 @@ export function generateLevel({ pack, trie, config, band, rng, id }: GenerateLev
       requiresFullWheelWord: true,
     });
 
+    if (stats) stats.succeeded = true;
     return {
       id,
       lang: pack.lang,
