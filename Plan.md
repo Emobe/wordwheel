@@ -110,7 +110,7 @@ Runs offline in `packages/tools`, with the logic in `packages/core`. Determinist
 7. Validate: every grid word spellable from the wheel, grid connected, no accidental words formed by adjacent tiles, blocklist check, at most one form of each base word in the grid, grid within size limits.
 8. Save the level into the pool for the band it was generated for, with its difficulty score attached. Levels are generated per band, not sorted into bands by score afterwards.
 
-This is more tractable than general crossword generation, because every grid word is spelled from the same wheel, so crossing letters are common by construction, the word set is chosen rather than fixed, and sparse layouts are normal for this genre rather than a failure. The generator report (Phase 0 gate) includes the retry rate, so a band that struggles to hit its size limit shows up before any levels ship.
+This is more tractable than general crossword generation, because every grid word is spelled from the same wheel, so crossing letters are common by construction, the word set is chosen rather than fixed, and sparse layouts are normal for this genre rather than a failure. Running `bun run generate` prints overall success and failure per level, plus average and max attempts per successful level, so a band that fails outright or only squeaks through on heavy retrying both show up before any levels ship (measured figures in section 21).
 
 The output is a **pool of levels per difficulty band per language**, far larger than anyone plays through. There is no fixed level 1, level 2 sequence. More pools can be downloaded later.
 
@@ -142,13 +142,13 @@ Every level must fit on a small phone without scrolling and stay readable. Nothi
 
 Design target: a 360 by 640 dp portrait screen, a common compact Android size. The wheel takes the lower part of the screen, so the grid gets roughly the top half. For comparison, a typical Wordscapes grid is around 10 columns by 8 rows.
 
-**Measured on device in Phase 1.** At true 360x640dp with the actual chrome (status bar, header, bonus line, word preview, shuffle button, margins) and the wheel at its 168dp floor, the grid area is 328x203dp. At the 28dp tile floor with 2dp gaps:
+**Measured on device, re-measured after the Phase 2 UI rework.** At true 360x640dp with the actual chrome (status bar, header, bonus line, word preview, shuffle button, margins) and the wheel at its 168dp floor, the grid area is 328x196dp (previously 328x203dp before the hint-icon and bonus-words-row rework). At the 28dp tile floor with 2dp gaps:
 
-- 6 rows use 6 x 28 + 5 x 2 = 178dp of the 203dp, leaving 25dp spare.
-- 7 rows need 208dp and clip by 5dp, so 6 rows is the hard ceiling at this screen size.
-- Width is not the binding limit. 9 columns use 268dp of 328dp. 11 columns would fit the width exactly (328dp), but the shape rule below caps a 6-row grid at 9 columns, so the shape rule is what sets the column limit.
+- 6 rows use 6 x 28 + 5 x 2 = 178dp of the 196dp, leaving 18dp spare (was 25dp).
+- 7 rows need 208dp and clip, so 6 rows is still the hard ceiling at this screen size.
+- Width allows 11 columns exactly (328dp, zero slack), but the shape rule below caps a 6-row grid at 9 columns, so the shape rule is what actually sets the column limit, not device width. The generator's own config sets `maxCols: 11` for this reason: it is the real width ceiling, correct on its own terms, but it never binds because the shape rule reaches 9 first. This is what the 11x6 config figure reported earlier referred to; the two numbers describe different layers, not a contradiction.
 
-| Max columns | Max rows | Tile width on the 360 dp design target |
+| Max columns (effective) | Max rows | Tile width on the 360 dp design target |
 |---|---|---|
 | 9 | 6 | about 28 dp |
 
@@ -163,7 +163,7 @@ Other limits:
 
 This is smaller than the original two-tier estimate (10x9 / 11x10), which was based on tile size alone and didn't account for how much space the fixed UI chrome and the wheel actually take up. Grid size can grow later once this is tested on a second, larger device, since a bigger screen has more real budget to spend.
 
-The grid budget must be re-measured whenever the game screen chrome changes. It has not been re-measured since the Phase 2 UI changes.
+The grid budget must be re-measured whenever the game screen chrome changes again.
 
 Rules:
 
@@ -266,7 +266,7 @@ Everything is data, so items and prices can be decided later without code change
 - **Change log:** each change (level completed, words found, coins or items gained or spent) is saved as a record with an ID, timestamp and a "synced" flag.
 - **Seen history:** per language, when each base word and wheel was last seen.
 - **Anonymous player ID** created on first install, so offline progress can attach to an account later.
-- **Android Auto Backup:** saves app data to the user's Google Drive, up to 25 MB, including databases by default. Progress survives a reinstall or new phone before there is a server. Downloaded level pools go in a folder excluded from backup, since they can be downloaded again.
+- **Android Auto Backup:** saves app data to the user's Google Drive, up to 25 MB, including databases by default. Progress survives a reinstall or new phone before there is a server. Downloaded level pools should go in a folder excluded from backup, since they can be downloaded again. Not yet applicable: there is no pool-download flow today, pools are bundled with the app, so there is no downloaded-pools folder to exclude yet. Revisit when pool downloading exists.
 - **Versioning:** the save records which pack and pool versions the player has. Migrations run when the app updates.
 - **Sync later:** upload unsynced records when online, the server merges them into the account and marks them done. Verification is designed at that point.
 
@@ -339,15 +339,24 @@ Each phase ends with a gate that must pass before the next starts.
 - **Layout scoring.** Section 7 step 4 says layouts are scored, but `layoutGrid` returns the first valid layout. About 47% of band 4 and 37% of band 5 levels in a 1,000-level run had no redundant crossings (no loops). That is a shape measure, not a defect by itself. Define a bad layout first (for example a crossings floor for the word count, or a fill density threshold), then fix. Parked.
 - **Pool size.** Bundled pools hold 100 levels per band, a placeholder (`mobile-fixtures.ts`). The 500 bundled levels total 395 KB, so about 2,000 band 5 levels would be about 2 MB uncompressed. With the proposed boundaries, band 4 is exactly 100 levels wide, so most players reach the pool's replay point (section 9) right around when they finish the band. `packages/core` implements the replay ranking in step 2 of section 9.
 - **Tutorial.** Static walkthrough, not guided levels.
-- **Grid budget.** Needs a re-measure after the Phase 2 UI changes.
+- **Grid budget (resolved).** Re-measured after the Phase 2 UI changes: 328x196dp, down from 328x203dp. Conclusion unchanged, 9x6 still holds.
 - **Band boundaries.** Confirmed values in section 10 are applied in `DEFAULT_CONFIG.bands` (the single source).
-- **Grid config.** A reported change to 11 columns is not visible in generated levels. The effective ceiling is 9x6.
+- **Grid config (resolved).** `maxCols` really is 11 in config, correct for device width, but `shapeColsFactor` (1.6) times `maxRows` (6) caps effective columns at 9 first, so 11 never binds. The 9x6 effective ceiling stands.
 - **Difficulty score.** Attached after generation and used for ranking within a band, not for band assignment.
+- **Band overlap (resolved).** The old boundaries had bands 3 and 4 both claiming level 1200. Fixed by the band boundary update above.
+- **Band 5 difficulty curve.** `DEFAULT_CONFIG.bands` gives band 5 a nominal maxLevel of 999999, so the target difficulty barely rises across the whole band. Section 10 describes a curve that reshapes without regenerating levels; this makes band 5 effectively flat. Needs a real ceiling or a different curve shape for that band.
+- **Coin display hardcoded.** GameScreen.tsx sets the level-complete coin display to a fixed 10 instead of reading the earning-rule config (section 13). Will drift if the reward changes.
 - **React warning** in GameScreen and Wheel (state set during render from onSelectionChange). Pre-existing.
 - **Metro** can hang silently or serve a stale bundle after a restart. Check with curl on /status, restart with --clear.
 - **Sound and haptics.** Confirmed firing for level complete and wrong selection. Word found not independently triggered.
 - **Tests.** No property-based test library. Generator tests are a fixed-seed loop of 20 samples.
-- **Purchases.** RevenueCat scaffold unverified.
+- **Purchases.** RevenueCat scaffold unverified: no API key, no Play Console listing, `initialize()` refuses to configure against an empty key rather than pretending to succeed.
+- **Retry rate (resolved).** `generateLevel` now reports attempts per level via an optional out-parameter, and `gen.ts` prints average and max attempts per successful level. Measured over 500 levels each: band 4 averaged 10.02 attempts (max 71), band 5 averaged 19.02 (max 135), both against the 200-attempt limit. Band 5's worst case is 65 attempts from the limit, closer to the edge than band 4. This is the retry-rate evidence relevant to the parked layout-scoring question (still parked, recorded here for when it's picked back up).
+- **Generation time regression.** The same 500-level runs took 303.94ms and 675.28ms average per level for bands 4 and 5, 17 to 35 times the 12 to 40ms in the original Phase 0 numbers (CLAUDE.md). Not yet investigated. Something in master's history since Phase 0 made generation substantially slower; likely candidate is the tightened grid/word-count config, unconfirmed.
+- **Root typecheck broken.** `tsc -b` at the repo root fails on `level-selection.test.ts:70:78` (`string | undefined` passed where `string` is expected). Predates the retry-rate branch, confirmed by reproducing with that branch's changes stashed. `apps/mobile`'s own typecheck doesn't catch it, since it's a different build target. Not yet fixed.
+- **Backup exclusion not applicable yet.** Section 14 describes downloaded pools going in a backup-excluded folder. There is no pool-download flow yet, pools are bundled with the app, so there is nothing to exclude. Revisit once pool downloading exists.
+- **Sound effects are placeholders.** Synthesized sine tones (`packages/tools/src/gen-sounds.ts`), not real sound design.
+- **UI language override not built.** Settings shows the current UI language as read-only text, no control to change it. Moot while only English exists (section 5).
 
 ## 22. Server and tournaments
 
