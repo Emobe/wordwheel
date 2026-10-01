@@ -67,7 +67,11 @@ describe("selectNextLevel", () => {
     const picks = new Set(
       Array.from({ length: 60 }, (_, i) => selectNextLevel(many, 100, played, noHistory, makeRng(i))?.id),
     );
-    for (const id of picks) expect(["m0", "m1", "m2", "m3", "m4"]).toContain(id);
+    // A null selection would surface here as `undefined` (from `?.id`), so
+    // check for it explicitly instead of letting toContain's string-only
+    // signature paper over it.
+    expect(picks.has(undefined)).toBe(false);
+    for (const id of picks) expect(["m0", "m1", "m2", "m3", "m4"]).toContain(id as string);
     expect(picks.size).toBeGreaterThan(1); // randomness applies to replays too
   });
 
